@@ -1,6 +1,6 @@
 {
   "name": "ex-drivers",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "crypto currency exchange drivers",
   "main": "index.js",
   "dependencies": {
@@ -8,13 +8,16 @@
     "clor": "^5.2.0",
     "debug": "^3.1.0",
     "delay": "^2.0.0",
+    "jsonic": "^0.3.0",
     "moment": "^2.22.1",
+    "node-bittrex-api": "^0.7.6",
     "node-fetch": "^2.1.2",
     "pako": "^1.0.6",
     "precise-number": "^1.0.6",
     "ramda": "^0.25.0",
     "request": "^2.86.0",
     "rpc-websockets": "^4.1.0",
+    "sha1": "^1.1.1",
     "underscore": "^1.9.0",
     "urlencode-for-php": "^1.0.4",
     "ws": "^5.1.1"

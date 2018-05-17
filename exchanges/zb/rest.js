@@ -3,7 +3,7 @@ const { ok } = require('assert');
 const R = require('ramda');
 const sha1 = require('sha1');
 const crypto = require('crypto');
-const fetch = require('zkt-fetch');
+const fetch = require('node-fetch');
 const debug = require('debug')('exchange:zb:rest');
 const debugOrder = require('debug')('order');
 

@@ -113,8 +113,8 @@ class EXCHANGE {
 		});
 
 		let depth = {
-			Asks: R.sort( R.descend( R.prop('Price') ), asks).slice(-20),
-			Bids: R.sort( R.descend( R.prop('Price') ), bids).slice(0, 20)
+			Asks: R.sort( R.ascend( R.prop('Price') ), asks),
+			Bids: R.sort( R.descend( R.prop('Price') ), bids)
 		};
 
 		this.options.onDepth(depth);

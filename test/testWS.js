@@ -1,10 +1,10 @@
 const ExDrivers = require('../');
 
-new ExDrivers.BINANCE({
+new ExDrivers.BITTREX({
 	isWS: true,
-	WSKey: 'a',
-	WSSecret: 'a',
-	Currency: 'ETH',
+	Key: 'a',
+	Secret: 'a',
+	Currency: 'BTC',
 	BaseCurrency: 'USDT',
 	onDepth(d) {
 		d.Asks = d.Asks.slice(0, 20).reverse();

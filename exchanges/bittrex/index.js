@@ -1,23 +1,24 @@
 const N = require('precise-number');
-const { ok, equal } = require('assert');
+const { ok } = require('assert');
 const R = require('ramda');
-const moment = require('moment');
 const jsonic = require('jsonic');
+const EXCHANGE = require('../exchange.js');
 
-class EXCHANGE {
+class BITTREX extends EXCHANGE {
 	constructor(options) {
-		if (!options.Currency) throw new Error('no Currency');
-		if (!options.BaseCurrency) options.BaseCurrency = 'USDT';
-		this.Currency = options.Currency;
-		this.BaseCurrency = options.BaseCurrency;
-		this.options = options;
+		options = Object.assign({
+			Name: 'Bittrex',
+			Fees: {
+				Maker: 0.002,
+				Taker: 0.002
+			},
+			RateLimit: 10
+		}, options);
+		super(options);
+		this.Currency = this.options.Currency;
+		this.BaseCurrency = this.options.BaseCurrency;
 		this.symbol = this.BaseCurrency + '-' + this.Currency;
 	
-		this.fee = {
-			Maker: 0.2,
-			Taker: 0.2
-		};
-
 		this.bittrex = require('node-bittrex-api');
 		this.bittrex.options({
 			apikey: options.Key,
@@ -26,8 +27,6 @@ class EXCHANGE {
 		});
 
 		this.orderbook = null;
-
-		this.wsReady = false;
 
 		if (this.options.isWS) {
 			if (typeof this.options.onDepth !== 'function') {
@@ -148,23 +147,6 @@ class EXCHANGE {
 			});
 		}
 
-		// if (data.Fills && data.Fills.length > 0) {
-		// 	data.Fills.map(d => {
-		// 		if (d.OrderType === 'SELL') {
-		// 			this.orderbook.Bids[d.Rate] -= d.Quantity;
-		// 			if (this.orderbook.Bids[d.Rate] <= 0) {
-		// 				delete(this.orderbook.Bids[d.Rate]);
-		// 			}
-		// 		} else {
-		// 			this.orderbook.Asks[d.Rate] -= d.Quantity;
-		// 			if (this.orderbook.Asks[d.Rate] <= 0) {
-		// 				delete(this.orderbook.Asks[d.Rate]);
-		// 			}
-		// 		}
-		// 	});
-		// }
-		
-
 		let asks = Object.keys(this.orderbook.Asks).map(price => {
 			return {
 				Price: N.parse(price),
@@ -188,50 +170,18 @@ class EXCHANGE {
 		});
 
 		let depth = {
-			Asks: R.sort( R.descend( R.prop('Price') ), asks).slice(-20),
-			Bids: R.sort( R.descend( R.prop('Price') ), bids).slice(0, 20)
+			Asks: R.sort( R.ascend( R.prop('Price') ), asks),
+			Bids: R.sort( R.descend( R.prop('Price') ), bids)
 		};
 
 		this.onDepthData(depth);
 	}
 
-
-	waitUntilWSReady() {
-		// console.log('waiting...');
-		return new Promise((done, reject) => {
-			this.wsReadyCallback = done;
-			setTimeout(() => {
-				delete(this.wsReadyCallback);
-				reject();
-			}, 30000);
-		});
-	}
-
-
 	onDepthData(depth) {
 		if (!this.wsReady) this.wsReady = true;
-		if (this.wsReadyCallback) {
-			this.wsReadyCallback(true);
-			delete(this.wsReadyCallback);
-		}
 		if (typeof this.options.onDepth === 'function') {
 			this.options.onDepth(depth);
 		}
-	}
-
-	SetFee(fee) {
-		ok(fee, 'no fee');
-		ok(fee.Maker);
-		ok(fee.Taker);
-		this.fee = fee;
-	}
-
-	GetFee() {
-		return this.fee;
-	}
-
-	GetName() {
-		return this.options.Name ? this.options.Name : 'Bittrex';
 	}
 
 	GetTicker() {
@@ -271,8 +221,8 @@ class EXCHANGE {
 			});
 
 			return Promise.resolve({
-				Asks: R.sort( R.descend( R.prop('Price') ), asks).slice(-size),
-				Bids: R.sort( R.descend( R.prop('Price') ), bids).slice(0, size)
+				Asks: R.sort( R.ascend( R.prop('Price') ), asks),
+				Bids: R.sort( R.descend( R.prop('Price') ), bids)
 			});
 		});
 	}
@@ -378,10 +328,6 @@ class EXCHANGE {
 		});
 	}
 
-	GetMin() {
-		return 0.02;
-	}
-
 	Buy(price, amount) {
 		ok( amount > 0, 'amount should greater than 0');
 		console.log(this.GetName(), 'Buy', price, amount);
@@ -434,4 +380,4 @@ class EXCHANGE {
 }
 
 
-module.exports = EXCHANGE;
+module.exports = BITTREX;

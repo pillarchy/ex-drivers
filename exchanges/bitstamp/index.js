@@ -1,12 +1,11 @@
 const Bitstamp = require('bitstamp-ws');
 const N = require('precise-number');
 const R = require('ramda');
-const wait = require('delay');
+const EXCHANGE = require('../exchange.js');
 
-class EXCHANGE {
+class BITSTAMP extends EXCHANGE {
 	constructor(options) {
-		this.options = options;
-		this.wsReady = false;
+		super(options);
 
 		const ws = new Bitstamp();
 
@@ -34,7 +33,7 @@ class EXCHANGE {
 			});
 
 			let depth = {
-				Asks: R.sort( R.descend( R.prop('Price') ), asks),
+				Asks: R.sort( R.ascend( R.prop('Price') ), asks),
 				Bids: R.sort( R.descend( R.prop('Price') ), bids)
 			};
 
@@ -43,18 +42,7 @@ class EXCHANGE {
 			this.options.onDepth(depth);
 		}
 	}
-
-
-	async waitUntilWSReady() {
-		let startTime = Date.now();
-		while (!this.wsReady) {
-			await wait(200);
-			if (Date.now() - startTime > 30000) throw new Error('bitstamp websocket timeout');
-		}
-		return true;
-	}
-
 }
 
 
-module.exports = EXCHANGE;
+module.exports = BITSTAMP;

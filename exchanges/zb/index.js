@@ -7,37 +7,29 @@ const EXCHANGE = require('../exchange.js');
 
 class ZB extends EXCHANGE {
 	constructor(options) {
+		options = Object.assign({
+			Name: 'ZB',
+			Fees: {
+				Taker: 0.002,
+				Maker: 0.002
+			},
+			RateLimit: 15,
+			MinTradeAmount: 0.001,
+			DefaultDepthSize: 30
+		}, options);
 		super(options);
-		this.Currency = options.Currency;
-		this.BaseCurrency = options.BaseCurrency;
 
-		if (!options.DefaultDepthSize) options.DefaultDepthSize = 20;
+		this.Currency = this.options.Currency;
+		this.BaseCurrency = this.options.BaseCurrency;
 
-		if (!options.rateLimiter) options.rateLimiter = new RateLimit(1000, 10);
-
-		this.options = options;
-
-		if (options.isWS) {
-			this.ws = new WS(options);
+		if (this.options.isWS) {
+			this.ws = new WS(this.options);
 		}
 
 		this.decimals = this.options.Decimals || 2;
-		this.stockDecimals = 4;
-		if (this.options.stockDecimals !== undefined) {
-			this.stockDecimals = this.options.stockDecimals;
-		}
-		if (this.options.StockDecimals !== undefined) {
-			this.stockDecimals = this.options.StockDecimals;
-		}
+		this.stockDecimals = this.options.StockDecimals;
 
-		this.rest = new REST(options);
-	
-		this.fee = {
-			BuyMaker: 0,
-			SellMaker: 0,
-			BuyTaker: 0,
-			SellTaker: 0
-		};
+		this.rest = new REST(this.options);
 	}
 
 	getHandler() {
@@ -87,13 +79,6 @@ class ZB extends EXCHANGE {
 
 	GetTicker(currency) {
 		return this.rest.GetTicker(currency);
-	}
-
-	GetMin() {
-		if (this.options.MinTradeAmount) return this.options.MinTradeAmount;
-		if (this.Currency === 'BTC') return 0.0001;
-		if (this.Currency === 'ZB') return 0.01;
-		return 0.001;
 	}
 
 	Buy(price, amount, currency) {

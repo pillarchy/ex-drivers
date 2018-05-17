@@ -9,6 +9,8 @@ class EXCHANGE {
 		ok(options.BaseCurrency, 'no BaseCurrency in options');
 		ok(options.Name, 'no Name in options');
 		ok(options.Fees, 'no Fees in options');
+		ok(options.Key, 'no Key in options');
+		ok(options.Secret, 'no Secret in options');
 
 		options = Object.assign({
 			RateLimit: 10,
