@@ -1,9 +1,7 @@
-const { ok, equal } = require('assert');
 const WS = require('./ws.js');
 const REST = require('./rest.js');
 const N = require('precise-number');
 const debug = require('debug')('exchange:zb');
-const redis = require('../../lib/redis');
 const RateLimit = require('../../lib/rate-limit');
 const EXCHANGE = require('../exchange.js');
 
@@ -12,8 +10,6 @@ class ZB extends EXCHANGE {
 		super(options);
 		this.Currency = options.Currency;
 		this.BaseCurrency = options.BaseCurrency;
-
-		this.redis_key = this.Currency + '_' + this.BaseCurrency + '_' + options.Key;
 
 		if (!options.DefaultDepthSize) options.DefaultDepthSize = 20;
 
@@ -71,7 +67,7 @@ class ZB extends EXCHANGE {
 
 				if (interestedCoins && interestedCoins.indexOf(a.key.toUpperCase()) !== -1) {
 					re[a.key.toUpperCase()] = N.parse(a.available);
-					re['Frozen'+a.key.toUpperCase()] = N.parse(a.freez);
+					re['Frozen' + a.key.toUpperCase()] = N.parse(a.freez);
 				}
 
 				if (a.key === 'usdt') {
@@ -105,20 +101,7 @@ class ZB extends EXCHANGE {
 		amount = N(amount).floor(this.stockDecimals);
 		console.log(this.GetName(), 'Buy', price, amount, currency || '');
 		return this.getHandler().Buy(price, amount, currency).then(id => {
-			this.addPendingOrderId(id);	
 			return id;
-		});
-	}
-
-	addPendingOrderId(id) {
-		redis.sadd(this.redis_key, id).catch(err => {
-			console.error('redis sadd error:', err);
-		});
-	}
-
-	removePendingOrderId(id) {
-		redis.srem(this.redis_key, id).catch(err => {
-			console.error('redis srem error:', err);
 		});
 	}
 
@@ -127,7 +110,6 @@ class ZB extends EXCHANGE {
 		amount = N(amount).floor(this.stockDecimals);
 		console.log(this.GetName(), 'Sell', price, amount, currency || '');
 		return this.getHandler().Sell(price, amount, currency).then(id => {
-			this.addPendingOrderId(id);
 			return id;
 		});
 	}
@@ -139,48 +121,30 @@ class ZB extends EXCHANGE {
 
 	CancelOrder(orderId, currency) {
 		return this.getHandler().CancelOrder(orderId, currency).then(result => {
-			if (result) {
-				this.removePendingOrderId(orderId);
-			}
 			return result;
 		}).catch(err => {
 			if (err && err.code === 3001) {
-				this.removePendingOrderId(orderId);
 				return true;
 			}
 			throw err;
 		});
 	}
 
-	async CancelPendingOrders(tried) {
-		if (tried <= 2) {
+	async CancelPendingOrders() {
+		return this.rest.GetOrders().then(arr => {
+			console.log('got pending order from api:', arr);
+			if (!arr) return [];
+			return arr.filter(o => (o.Status === 'Pending' || o.Status === 'Partial'));
+		}).then(async orders => {
 			let re = {};
-			let ids = await redis.smembers(this.redis_key);
-			console.log('got pending order id array from reids:', ids);
-			if (ids && ids.length > 0) {
-				for(let id of ids) {
-					console.log('cancelling', id);
-					re[id] = await this.CancelOrder(id);
+			if (orders && orders.length > 0) {
+				debug('cancelling ', orders.length, 'orders');
+				for (let i = 0; i < orders.length; i++) {
+					re[orders[i].Id] = await this.CancelOrder(orders[i].Id);
 				}
 			}
 			return re;
-		} else {
-			console.log('getting pending order from api');
-			return this.rest.GetOrders().then(arr => {
-				console.log('got pending order from api:', arr);
-				if (!arr) return [];
-				return arr.filter(o => (o.Status === 'Pending' || o.Status === 'Partial'));
-			}).then(async orders => {
-				let re = {};
-				if (orders && orders.length > 0) {
-					debug('cancelling ', orders.length, 'orders');
-					for (let i = 0; i < orders.length; i++) {
-						re[orders[i].Id] = await this.CancelOrder(orders[i].Id);
-					}
-				}
-				return re;
-			});
-		}
+		});
 	}
 
 	GetOrders(currency) {
@@ -191,13 +155,6 @@ class ZB extends EXCHANGE {
 			}
 			return arr;
 		}).then(orders => {
-			if (orders && orders.length > 0) {
-				orders.map(o => {
-					if (o.Status === 'Cancelled' || o.Status === 'Closed') {
-						this.removePendingOrderId(orderId);
-					}
-				});
-			}
 			return orders;
 		}).catch(err => {
 			if (err.code === 3001) return [];
@@ -206,9 +163,6 @@ class ZB extends EXCHANGE {
 
 	GetOrder(orderId) {
 		return this.getHandler().GetOrder(orderId).then(o => {
-			if (o.Status === 'Cancelled' || o.Status === 'Closed') {
-				this.removePendingOrderId(orderId);
-			}
 			return o;
 		});
 	}

@@ -45,14 +45,14 @@ class EXCHANGE {
  					'Origin': 'https://www.bithumb.com'
 				}
 			});
-			this.ws.on('open', ()=>{
+			this.ws.on('open', () => {
 				debugWS('connected');
-				this.ws.send('{"currency":"'+this.symbol+'","service":"orderbook"}');
+				this.ws.send('{"currency":"' + this.symbol + '","service":"orderbook"}');
 			});
 
 			this.wsReady = false;
 
-			this.ws.on('message', s=>{
+			this.ws.on('message', s => {
 				debugWS('message', s);
 				try {
 					let {data, header, status} = JSON.parse(s);
@@ -60,7 +60,7 @@ class EXCHANGE {
 						let total = data.asks.length + data.bids.length;
 						this.updateOrderBook(data);
 					}
-				} catch( err ) {}
+				} catch ( err ) {}
 			});
 		}
 
@@ -135,21 +135,21 @@ class EXCHANGE {
 			return {
 				Price: price,
 				Amount: N.parse(this.orderbook.Asks[price])
-			}
-		}).filter(d=>d.Amount > 0);
+			};
+		}).filter(d => d.Amount > 0);
 
 		let bids = Object.keys(this.orderbook.Bids).map(price => {
 			return {
 				Price: price,
 				Amount: N.parse(this.orderbook.Bids[price])
-			}
-		}).filter(d=>d.Amount > 0);
+			};
+		}).filter(d => d.Amount > 0);
 
 		this.orderbook = { Asks:{}, Bids:{}};
-		asks.map(r=>{
+		asks.map(r => {
 			this.orderbook.Asks[r.Price] = r.Amount;
 		});
-		bids.map(r=>{
+		bids.map(r => {
 			this.orderbook.Bids[r.Price] = r.Amount;
 		});
 
@@ -167,19 +167,19 @@ class EXCHANGE {
 				return {
 					Price: this.parsePrice(price),
 					Amount: N.parse(this.orderbook.Asks[price])
-				}
-			}).filter(d=>d.Amount > 0);
+				};
+			}).filter(d => d.Amount > 0);
 
 			let bids = Object.keys(this.orderbook.Bids).map(price => {
 				return {
 					Price: this.parsePrice(price),
 					Amount: N.parse(this.orderbook.Bids[price])
-				}
-			}).filter(d=>d.Amount > 0);
+				};
+			}).filter(d => d.Amount > 0);
 
 			let depth = {
 				Asks: R.sort( R.descend( R.prop('Price') ), asks).slice(-20),
-				Bids: R.sort( R.descend( R.prop('Price') ), bids).slice(0,20)
+				Bids: R.sort( R.descend( R.prop('Price') ), bids).slice(0, 20)
 			};
 
 			this.options.onDepth(depth);
@@ -197,7 +197,7 @@ class EXCHANGE {
 				}
 			});
 
-			setTimeout(()=>{
+			setTimeout(() => {
 				if (this.wsReady) return;
 				clearInterval(timer);
 				debugWS('waitUntilWSReady timeout');
@@ -229,7 +229,7 @@ class EXCHANGE {
 	}
 
 	GetTicker() {
-		return this.rest('getTicker', this.symbol).then(data=>{
+		return this.rest('getTicker', this.symbol).then(data => {
 			return {
 				Buy: this.parsePrice(data.buy_price),
 				Sell: this.parsePrice(data.sell_price),
@@ -238,35 +238,35 @@ class EXCHANGE {
 				High: this.parsePrice(data.max_price),
 				Low: this.parsePrice(data.min_price)
 			};
-		})
+		});
 	}
 
 	GetDepth(size) {
 		if (!size) size = 20;
-		return this.rest('getOrderbook', this.symbol).then(data=>{
-			let asks = data.asks.map(r=>{
+		return this.rest('getOrderbook', this.symbol).then(data => {
+			let asks = data.asks.map(r => {
 				return {
 					Price: this.parsePrice(r.price),
 					Amount: N.parse(r.quantity)
-				}
+				};
 			});
 
-			let bids = data.bids.map(r=>{
+			let bids = data.bids.map(r => {
 				return {
 					Price: this.parsePrice(r.price),
 					Amount: N.parse(r.quantity)
-				}
+				};
 			});
 
 			return Promise.resolve({
 				Asks: R.sort( R.descend( R.prop('Price') ), asks).slice(-size),
-				Bids: R.sort( R.descend( R.prop('Price') ), bids).slice(0,size)
+				Bids: R.sort( R.descend( R.prop('Price') ), bids).slice(0, size)
 			});
 		});
 	}
 
 	GetAccount() {
-		return this.rest('getBalance', this.symbol).then(data =>{
+		return this.rest('getBalance', this.symbol).then(data => {
 			return {
 				Balance: this.parsePrice(data.available_krw),
 				FrozenBalance: this.parsePrice(data.in_use_krw),

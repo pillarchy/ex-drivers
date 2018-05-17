@@ -41,7 +41,7 @@ class EXCHANGE {
 		if (this.options.onIndex) {
 			handlers[`ok_sub_futureusd_${this.options.Currency.toLowerCase()}_index`] = (data, err) => {
 				this.onIndex(data, err);
-			}
+			};
 		}
 
 		if (options.onAccountChange) {
@@ -53,7 +53,7 @@ class EXCHANGE {
 		if (options.onTicker) {
 			handlers[`ok_sub_futureusd_${this.options.Currency.toLowerCase()}_ticker_${this.options.DefaultContactType.toLowerCase()}`] = (data, err) => {
 				this.onTicker(data, err);
-			}
+			};
 		}
 
 		if (options.onPositionChange) {

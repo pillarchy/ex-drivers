@@ -21,13 +21,13 @@ class Kraken {
 		this.secret = options.Secret;
 		if (!options.Currency) options.Currency = 'BTC';
 		this.options = options;
-		this.symbol = 'X'+options.Currency.toUpperCase()+'ZUSD';
+		this.symbol = 'X' + options.Currency.toUpperCase() + 'ZUSD';
 
 		this.kraken = new KrakenClient(this.key, this.secret);
 	}
 
 	GetTicker() {
-		return this.kraken.api('Ticker', { pair : this.symbol }).then(data=>{
+		return this.kraken.api('Ticker', { pair : this.symbol }).then(data => {
 			if (data && data.result && data.result[this.symbol]) {
 				let ticker = data.result[this.symbol];
 				return Promise.resolve({
@@ -50,19 +50,19 @@ class Kraken {
 		return this.kraken.api('Depth', {
 			pair : this.symbol,
 			count: size
-		}).then(data=>{
+		}).then(data => {
 			if (data && data.result && data.result[this.symbol]) {
-				let asks = data.result[this.symbol].asks.map(r=>{
+				let asks = data.result[this.symbol].asks.map(r => {
 					return {
 						Price: N.parse(r[0]),
 						Amount: N.parse(r[1])
-					}
+					};
 				});
-				let bids = data.result[this.symbol].bids.map(r=>{
+				let bids = data.result[this.symbol].bids.map(r => {
 					return {
 						Price: N.parse(r[0]),
 						Amount: N.parse(r[1])
-					}
+					};
 				});
 
 				return Promise.resolve({
@@ -80,7 +80,7 @@ class Kraken {
 	}
 
 	GetOrders() {
-		return this.kraken.api('OpenOrders').then(data=>{
+		return this.kraken.api('OpenOrders').then(data => {
 			if (data.error && data.error.length > 0) throw data.error;
 			let orders = (data.result && data.result.open ) || {};
 			Object.keys(orders).map(order_id => {
@@ -92,7 +92,7 @@ class Kraken {
 	_transform_order(o) {
 		return {
 			
-		}
+		};
 	}
 
 	GetOrder(orderId) {

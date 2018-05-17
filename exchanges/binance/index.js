@@ -6,10 +6,18 @@ const EXCHANGE = require('../exchange.js');
 
 class BINANCE extends EXCHANGE {
 	constructor(options) {
+		options = Object.assign({
+			Name: 'Binance',
+			Fees: {
+				Taker: 0.002,
+				Maker: 0.002
+			}
+		}, options);
+
 		super(options);
 		this.Currency = options.Currency;
 		this.options = options;
-		this.symbol = options.Currency+'USDT';
+		this.symbol = options.Currency + 'USDT';
 	
 
 		this.restAPI = new api.BinanceRest({
@@ -41,47 +49,44 @@ class BINANCE extends EXCHANGE {
 			// 	console.log('user data', data);
 			// }, 60000); // Optional, how often the keep alive should be sent in milliseconds
 
-			setInterval(()=>{
+			setInterval(() => {
 				this.buildOrderBook();
 			}, 60000);
 		}
 
 		this.rest = (method, query) => {
-			return new Promise((done, reject)=>{
-				this.restAPI[method](query, (err, data)=>{
+			return new Promise((done, reject) => {
+				this.restAPI[method](query, (err, data) => {
 					if (err) {
 						reject(err);
 					} else {
 						done(data);
 					}
 				});
-			})
+			});
 		};
 
 	}
 
-	buildOrderBook(data) {
+	buildOrderBook() {
 		// console.log(this.GetName(), 'building order book ... ');
 		return this.rest('depth', {
 			symbol: this.symbol
-		}).then(data=>{
-			if (!data || !data.bids || !data.asks) throw new Error('get Binance '+this.symbol+' depth error '+JSON.stringify(data));
+		}).then(data => {
+			if (!data || !data.bids || !data.asks) throw new Error('get Binance ' + this.symbol + ' depth error ' + JSON.stringify(data));
 
 			this.orderbook = { Asks:{}, Bids:{}};
-			data.asks.map(r=>{
+			data.asks.map(r => {
 				this.orderbook.Asks[r[0]] = N.parse(r[1]);
 			});
-			data.bids.map(r=>{
+			data.bids.map(r => {
 				this.orderbook.Bids[r[0]] = N.parse(r[1]);
 			});
-			// console.log(this.GetName(), 'orderbook built');
-
-			// this.onDepthData();
 
 			return this.orderbook;
-		}).catch(err=>{
-			console.error(this.GetName()+' get depth error when building orderbook');
-		})
+		}).catch(err => {
+			console.error(this.GetName() + ' get depth error when building orderbook');
+		});
 	}
 
 	updateOrderBook(data) {
@@ -122,23 +127,23 @@ class BINANCE extends EXCHANGE {
 			return {
 				Price: price,
 				Amount: N.parse(this.orderbook.Asks[price])
-			}
-		}).filter(d=>d.Amount > 0);
+			};
+		}).filter(d => d.Amount > 0);
 
 		let bids = Object.keys(this.orderbook.Bids).map(price => {
 			return {
 				Price: price,
 				Amount: N.parse(this.orderbook.Bids[price])
-			}
-		}).filter(d=>d.Amount > 0);
+			};
+		}).filter(d => d.Amount > 0);
 
 		this.orderbook = { Asks:{}, Bids:{}};
-		asks.map(r=>{
+		asks.map(r => {
 			this.orderbook.Asks[r.Price] = r.Amount;
 			r.Price = N.parse(r.Price);
 			return r;
 		});
-		bids.map(r=>{
+		bids.map(r => {
 			this.orderbook.Bids[r.Price] = r.Amount;
 			r.Price = N.parse(r.Price);
 			return r;
@@ -160,19 +165,19 @@ class BINANCE extends EXCHANGE {
 				return {
 					Price: N.parse(price),
 					Amount: N.parse(this.orderbook.Asks[price])
-				}
-			}).filter(d=>d.Amount > 0);
+				};
+			}).filter(d => d.Amount > 0);
 
 			let bids = Object.keys(this.orderbook.Bids).map(price => {
 				return {
 					Price: N.parse(price),
 					Amount: N.parse(this.orderbook.Bids[price])
-				}
-			}).filter(d=>d.Amount > 0);
+				};
+			}).filter(d => d.Amount > 0);
 
 			let depth = {
-				Asks: R.sort( R.descend( R.prop('Price') ), asks).slice(-20),
-				Bids: R.sort( R.descend( R.prop('Price') ), bids).slice(0,20)
+				Asks: R.sort( R.ascend( R.prop('Price') ), asks),
+				Bids: R.sort( R.descend( R.prop('Price') ), bids)
 			};
 
 			this.options.onDepth(depth);
@@ -180,7 +185,7 @@ class BINANCE extends EXCHANGE {
 	}
 
 	GetTicker() {
-		return this.rest('ticker24hr',{ symbol : this.symbol }).then(data=>{
+		return this.rest('ticker24hr', { symbol : this.symbol }).then(data => {
 			return {
 				Buy: N.parse(data.bidPrice),
 				Sell: N.parse(data.askPrice),
@@ -189,7 +194,7 @@ class BINANCE extends EXCHANGE {
 				High: N.parse(data.highPrice),
 				Low: N.parse(data.lowPrice)
 			};
-		})
+		});
 	}
 
 	GetDepth(size) {
@@ -197,32 +202,32 @@ class BINANCE extends EXCHANGE {
 		return this.rest('depth', {
 			symbol: this.symbol,
 			limit: size
-		}).then(data=>{
-			if (!data || !data.bids || !data.asks) throw new Error('get Binance '+this.symbol+' depth error '+JSON.stringify(data));
+		}).then(data => {
+			if (!data || !data.bids || !data.asks) throw new Error('get Binance ' + this.symbol + ' depth error ' + JSON.stringify(data));
 
-			let asks = data.asks.map(r=>{
+			let asks = data.asks.map(r => {
 				return {
 					Price: N.parse(r[0]),
 					Amount: N.parse(r[1])
-				}
+				};
 			});
 
-			let bids = data.bids.map(r=>{
+			let bids = data.bids.map(r => {
 				return {
 					Price: N.parse(r[0]),
 					Amount: N.parse(r[1])
-				}
+				};
 			});
 
 			return Promise.resolve({
-				Asks: R.sort( R.descend( R.prop('Price') ), asks),
+				Asks: R.sort( R.ascend( R.prop('Price') ), asks),
 				Bids: R.sort( R.descend( R.prop('Price') ), bids)
 			});
 		});
 	}
 
 	GetAccount() {
-		return this.rest('account').then(data=>{
+		return this.rest('account').then(data => {
 
 			if (data && data.balances) {
 				let re = {
@@ -231,7 +236,7 @@ class BINANCE extends EXCHANGE {
 					Stocks: null,
 					FrozenStocks: null
 				};
-				data.balances.map(r=>{
+				data.balances.map(r => {
 					if (r.asset === this.Currency) {
 						re.Stocks = N.parse(r.free);
 						re.FrozenStocks = N.parse(r.locked);
@@ -242,30 +247,13 @@ class BINANCE extends EXCHANGE {
 				});
 
 				if (re.Balance === null || re.FrozenBalance === null || re.Stocks === null || re.FrozenStocks === null) {
-					throw new Error('binance GetAccount returns error: '+JSON.stringify(data));
+					throw new Error('binance GetAccount returns error: ' + JSON.stringify(data));
 				}
 
 				return re;
 			} else {
-				throw new Error('binance GetAccount return error: '+JSON.stringify(data));
+				throw new Error('binance GetAccount return error: ' + JSON.stringify(data));
 			}
-			// let re = {
-			// 	Balance: 0,
-			// 	FrozenBalance: 0,
-			// 	Stocks: 0,
-			// 	FrozenStocks: 0
-			// };
-			// accounts.map(account=>{
-			// 	if (account.Currency === this.Currency) {
-			// 		re.Stocks = account.Available;
-			// 		re.FrozenStocks = N.minus(account.Balance, account.Available);
-			// 	}
-			// 	if (account.Currency === 'USDT') {
-			// 		re.Balance = account.Available;
-			// 		re.FrozenBalance = N.minus(account.Balance, account.Available);
-			// 	}
-			// });
-			// return re;
 		});
 	}
 
@@ -289,7 +277,7 @@ class BINANCE extends EXCHANGE {
 		 */
 		return this.rest('openOrders', {
 			symbol: this.symbol
-		}).then(orders => orders.map(o=> {
+		}).then(orders => orders.map(o => {
 			return {
 				Id: o.orderId,
 				Price: N.parse(o.price),
@@ -347,15 +335,15 @@ class BINANCE extends EXCHANGE {
 		REJECTED
 		EXPIRED
 		 */
-		switch(status) {
-			case 'NEW': 
-			case 'PARTIALLY_FILLED': return 'Pending';
-			case 'FILLED': return 'Closed';
-			case 'CANCELED': return 'Cancelled';
-			case 'PENDING_CANCEL': return 'Cancelled';
-			case 'REJECTED': return 'Cancelled';
-			case 'EXPIRED': return 'Cancelled';
-			default: return status;
+		switch (status) {
+				case 'NEW': 
+				case 'PARTIALLY_FILLED': return 'Pending';
+				case 'FILLED': return 'Closed';
+				case 'CANCELED': return 'Cancelled';
+				case 'PENDING_CANCEL': return 'Cancelled';
+				case 'REJECTED': return 'Cancelled';
+				case 'EXPIRED': return 'Cancelled';
+				default: return status;
 		}
 	}
 
@@ -376,9 +364,9 @@ class BINANCE extends EXCHANGE {
 			params.timeInForce = 'GTC';
 		}
 
-		return this.rest('newOrder', params).then( r=> {
+		return this.rest('newOrder', params).then( r => {
 			if (r && r.orderId) return r.orderId;
-			throw new Error(this.GetName()+' sell failed '+JSON.stringify(r));
+			throw new Error(this.GetName() + ' sell failed ' + JSON.stringify(r));
 		});
 	}
 
@@ -398,9 +386,9 @@ class BINANCE extends EXCHANGE {
 			params.price = price;
 			params.timeInForce = 'GTC';
 		}
-		return this.rest('newOrder', params).then( r=> {
+		return this.rest('newOrder', params).then( r => {
 			if (r && r.orderId) return r.orderId;
-			throw new Error(this.GetName()+' sell failed '+JSON.stringify(r));
+			throw new Error(this.GetName() + ' sell failed ' + JSON.stringify(r));
 		});
 	}
 
@@ -409,18 +397,18 @@ class BINANCE extends EXCHANGE {
 			symbol: this.symbol,
 			orderId,
 			timestamp: Date.now()
-		}).then(result=>{
+		}).then(result => {
 			return !!result.clientOrderId;
 		});
 	}
 
 	CancelPendingOrders() {
-		console.log(this.GetName()+' cancelling pending orders...');
-		return this.GetOrders().then( orders=>{
-			console.log(this.GetName()+' cancelling',orders.length,'orders');
-			return Promise.all(orders.map( o=> {
+		console.log(this.GetName() + ' cancelling pending orders...');
+		return this.GetOrders().then( orders => {
+			console.log(this.GetName() + ' cancelling', orders.length, 'orders');
+			return Promise.all(orders.map( o => {
 				return this.CancelOrder(o.Id);
-			})).then( results=>{
+			})).then( results => {
 				console.log(this.GetName(), results);
 				return true;
 			});

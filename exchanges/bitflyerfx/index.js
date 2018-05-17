@@ -12,7 +12,7 @@ class EXCHANGE {
 		if (!options.Currency) options.Currency = 'BTC';
 		this.Currency = options.Currency;
 		this.options = options;
-		this.symbol = options.Currency+'_JPY';
+		this.symbol = options.Currency + '_JPY';
 
 		this.rate = options.Rate || 0.008913331224;
 	
@@ -158,14 +158,14 @@ class EXCHANGE {
 
 		let asks = Object.keys(this.orderbook.Asks).map(price => {
 			return {
-				Price: N(price).multiply(this.rate).floor(2)*1,
+				Price: N(price).multiply(this.rate).floor(2) * 1,
 				Amount: N.parse(this.orderbook.Asks[price])
 			};
 		}).filter(d => d.Amount > 0);
 
 		let bids = Object.keys(this.orderbook.Bids).map(price => {
 			return {
-				Price: N(price).multiply(this.rate).floor(2)*1,
+				Price: N(price).multiply(this.rate).floor(2) * 1,
 				Amount: N.parse(this.orderbook.Bids[price])
 			};
 		}).filter(d => d.Amount > 0);
@@ -237,9 +237,9 @@ class EXCHANGE {
 		return new Promise((done, reject) => {
 			this.rest.getCollateral((err, data) => {
 				if (err)
-					reject(err);
+				{reject(err);}
 				else
-					done(data);
+				{done(data);}
 			});
 		}).then(data => {
 			return data;
@@ -265,18 +265,18 @@ class EXCHANGE {
 						re.Stocks = N.parse(r.amount);
 						// re.FrozenStocks = N(r.amount).minus(r.available)*1;
 					} else if (r.currency_code === 'JPY') {
-						re.Balance = N(r.amount).multiply(this.rate).floor(2)*1;
+						re.Balance = N(r.amount).multiply(this.rate).floor(2) * 1;
 						// re.FrozenBalance = N(r.amount).minus(r.available).multiply(this.rate).floor(2)*1;
 					}
 				});
 
 				if (re.Balance === null || re.FrozenBalance === null || re.Stocks === null || re.FrozenStocks === null) {
-					throw new Error(this.GetName() + 'GetAccount returns error: '+JSON.stringify(data));
+					throw new Error(this.GetName() + 'GetAccount returns error: ' + JSON.stringify(data));
 				}
 
 				return re;
 			} else {
-				throw new Error(this.GetName() + 'GetAccount return error: '+JSON.stringify(data));
+				throw new Error(this.GetName() + 'GetAccount return error: ' + JSON.stringify(data));
 			}
 		});
 	}
@@ -330,15 +330,15 @@ class EXCHANGE {
 		REJECTED
 		EXPIRED
 		 */
-		switch(status) {
-			case 'NEW': 
-			case 'PARTIALLY_FILLED': return 'Pending';
-			case 'FILLED': return 'Closed';
-			case 'CANCELED': return 'Cancelled';
-			case 'PENDING_CANCEL': return 'Cancelled';
-			case 'REJECTED': return 'Cancelled';
-			case 'EXPIRED': return 'Cancelled';
-			default: return status;
+		switch (status) {
+				case 'NEW': 
+				case 'PARTIALLY_FILLED': return 'Pending';
+				case 'FILLED': return 'Closed';
+				case 'CANCELED': return 'Cancelled';
+				case 'PENDING_CANCEL': return 'Cancelled';
+				case 'REJECTED': return 'Cancelled';
+				case 'EXPIRED': return 'Cancelled';
+				default: return status;
 		}
 	}
 
@@ -363,9 +363,9 @@ class EXCHANGE {
 			params.timeInForce = 'GTC';
 		}
 
-		return this.rest('newOrder', params).then( r=> {
+		return this.rest('newOrder', params).then( r => {
 			if (r && r.orderId) return r.orderId;
-			throw new Error(this.GetName()+' sell failed '+JSON.stringify(r));
+			throw new Error(this.GetName() + ' sell failed ' + JSON.stringify(r));
 		});
 	}
 
@@ -385,9 +385,9 @@ class EXCHANGE {
 			params.price = price;
 			params.timeInForce = 'GTC';
 		}
-		return this.rest('newOrder', params).then( r=> {
+		return this.rest('newOrder', params).then( r => {
 			if (r && r.orderId) return r.orderId;
-			throw new Error(this.GetName()+' sell failed '+JSON.stringify(r));
+			throw new Error(this.GetName() + ' sell failed ' + JSON.stringify(r));
 		});
 	}
 
@@ -396,18 +396,18 @@ class EXCHANGE {
 			symbol: this.symbol,
 			orderId,
 			timestamp: Date.now()
-		}).then(result=>{
+		}).then(result => {
 			return !!result.clientOrderId;
 		});
 	}
 
 	CancelPendingOrders() {
-		console.log(this.GetName()+' cancelling pending orders...');
-		return this.GetOrders().then( orders=>{
-			console.log(this.GetName()+' cancelling',orders.length,'orders');
-			return Promise.all(orders.map( o=> {
+		console.log(this.GetName() + ' cancelling pending orders...');
+		return this.GetOrders().then( orders => {
+			console.log(this.GetName() + ' cancelling', orders.length, 'orders');
+			return Promise.all(orders.map( o => {
 				return this.CancelOrder(o.Id);
-			})).then( results=>{
+			})).then( results => {
 				console.log(this.GetName(), results);
 				return true;
 			});

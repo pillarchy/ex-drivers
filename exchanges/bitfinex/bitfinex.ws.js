@@ -16,7 +16,7 @@ class Bitfinex {
 
 		if (!options.Currency) options.Currency = 'BTC';
 		this.options = options;
-		this.symbol = options.Currency.toLowerCase()+'usd';
+		this.symbol = options.Currency.toLowerCase() + 'usd';
 
 		const opts = {
 			version: 2,
@@ -26,7 +26,7 @@ class Bitfinex {
 		this.ws = new BFX(this.key, this.secret, opts).ws;
 
 		this.ws.on('auth', () => {
-			console.log('authenticated')
+			console.log('authenticated');
 		});
 
 		this.ws.on('message', () => {
@@ -34,7 +34,7 @@ class Bitfinex {
 		});
 
 		this.ws.on('open', () => {
-			this.ws.subscribeOrderBook(this.symbol.toUpperCase(), 'P0')
+			this.ws.subscribeOrderBook(this.symbol.toUpperCase(), 'P0');
 			this.ws.auth();
 		});
 
@@ -106,7 +106,7 @@ class Bitfinex {
 				process.exit();
 			}, 60000);
 
-			while(true) {
+			while (true) {
 				await wait(100);
 				if (this.ws_ready) break;
 			}
@@ -130,31 +130,31 @@ class Bitfinex {
 		if (Array.isArray(data)) {
 			data.map(r => {
 				if (r && r.PRICE && r.AMOUNT) {
-					this.orderbook[r.PRICE+''] = r.AMOUNT;
+					this.orderbook[r.PRICE + ''] = r.AMOUNT;
 				}
-			})
+			});
 		} else {
 			if (data && data.PRICE && data.AMOUNT) {
 
-				if (data.COUNT*1 == 0) {
-					delete(this.orderbook[data.PRICE+'']);
+				if (data.COUNT * 1 == 0) {
+					delete(this.orderbook[data.PRICE + '']);
 				} else {
-					if (data.AMOUNT*1 > 0) {
+					if (data.AMOUNT * 1 > 0) {
 						Object.keys(this.orderbook).map(price => {
-							let amount = this.orderbook[price]*1;
-							if (amount < 0 && price*1 < data.PRICE*1) {
+							let amount = this.orderbook[price] * 1;
+							if (amount < 0 && price * 1 < data.PRICE * 1) {
 								delete(this.orderbook[price]);
 							}
 						});
 					} else {
 						Object.keys(this.orderbook).map(price => {
-							let amount = this.orderbook[price]*1;
-							if (amount > 0 && price*1 > data.PRICE*1) {
+							let amount = this.orderbook[price] * 1;
+							if (amount > 0 && price * 1 > data.PRICE * 1) {
 								delete(this.orderbook[price]);
 							}
 						});
 					}
-					this.orderbook[data.PRICE+''] = data.AMOUNT;
+					this.orderbook[data.PRICE + ''] = data.AMOUNT;
 				}
 			}
 		}
@@ -171,7 +171,7 @@ class Bitfinex {
 			} else {
 				asks.push({
 					Price: N.parse(price),
-					Amount: N.parse(amount*-1)
+					Amount: N.parse(amount * -1)
 				});
 			}
 		});
@@ -183,18 +183,18 @@ class Bitfinex {
 		if (bids.length > 30) bids = bids.slice(0, 30);
 
 		let orders = {};
-		asks.map(r=>{
-			orders[r.Price+''] = -1*r.Amount;
+		asks.map(r => {
+			orders[r.Price + ''] = -1 * r.Amount;
 		});
-		bids.map(r=>{
-			orders[r.Price+''] = r.Amount;
+		bids.map(r => {
+			orders[r.Price + ''] = r.Amount;
 		});
 		this.orderbook = orders;
 
 		if (typeof this.options.onDepth === 'function') {
 			this.options.onDepth({
-				Asks: R.sort( R.descend( R.prop('Price') ), asks),
-				Bids: bids
+				Asks: R.sort( R.ascend( R.prop('Price') ), asks),
+				Bids: R.sort( R.descend( R.prop('Price')), bids)
 			});
 		}
 	}

@@ -1,4 +1,4 @@
-const md5 = require('md5');
+const md5 = s => crypto.createHash('md5').update(s).digest('hex');
 const fetch = require('node-fetch');
 const N = require('precise-number');
 const R = require('ramda');
@@ -11,15 +11,12 @@ class OKCoin {
 		this.debug = true;
 		this.key = options.Key;
 		this.secret = options.Secret;
-		if (!options.Currency) options.Currency = 'BCH';
-		if (!options.BaseCurrency) options.BaseCurrency = 'BTC';
-        if (!options.rateLimiter) throw new Error('no rateLimiter');
 		this.coin_type = options.Currency.toLowerCase() + '_' + options.BaseCurrency.toLowerCase();
-        this.options = options;
+		this.options = options;
 	}
 
 	async fetch(url, params, method) {
-        await this.options.rateLimiter.wait();
+		await this.options.rateLimiter.wait();
 		if (!params) params = {};
 		params.api_key = this.key;
 		params.sign = sign(params, this.secret);
@@ -43,17 +40,17 @@ class OKCoin {
 				'Content-Length': body.length
 			}
 		}).then(async res => {
-            return [res, await res.text()];
-        }).then(([res, t]) => {
+			return [res, await res.text()];
+		}).then(([res, t]) => {
 			debug('>> ' + t);
 
 			if (!t) {
-                if (res.status >= 400) {
-                    return Promise.reject('OKEX rest status error: ' + res.status + ' '+res.statusText);
-                }
-                console.log(res);
-                return Promise.reject('OKEX returns empty: ' + url);
-            }
+				if (res.status >= 400) {
+					return Promise.reject('OKEX rest status error: ' + res.status + ' ' + res.statusText);
+				}
+				console.log(res);
+				return Promise.reject('OKEX returns empty: ' + url);
+			}
 			try {
 				let d = JSON.parse(t);
 				return Promise.resolve(d);
@@ -110,7 +107,7 @@ class OKCoin {
 	}
 
 	async Trade(type, price, amount) {
-        let startTime = Date.now();
+		let startTime = Date.now();
 		let params = {
 			symbol: this.coin_type,
 			type,
@@ -125,8 +122,8 @@ class OKCoin {
 			delete(params.price);
 		}
 		let re = await this.fetch('trade.do', params);
-        console.log('Trade API turn around:', Date.now() - startTime);
-        return re;
+		console.log('Trade API turn around:', Date.now() - startTime);
+		return re;
 	}
 
 	Buy(price, amount) {

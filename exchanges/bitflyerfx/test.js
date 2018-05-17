@@ -8,7 +8,7 @@ let ex = new EX({
 	Currency: 'BTC',
 	Rate: 1,
 	isWS: false,
-	onDepth: (depth)=>{
+	onDepth: (depth) => {
 		console.log(depth);
 	}
 });
@@ -34,7 +34,7 @@ describe('test Bitflyer', function() {
 	// 	return ex.GetOrders().then(log);
 	// });
 	
-	it('should wait for a long time', function(){
+	it('should wait for a long time', function() {
 		this.timeout(1000000000);
 		return wait(1000000000);
 	});

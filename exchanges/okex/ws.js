@@ -8,15 +8,7 @@ const debug = require('debug')('okex:ws');
 class EXCHANGE {
 
 	constructor(options) {
-
-		this.accountInfoQueue = new Queue(10000);
-		this.tradeQueue = new Queue(3000);
-		this.orderInfoQueue = new Queue(3000);
-		this.cancelOrderQueue = new Queue(3000);
-
 		this.options = options;
-
-		if (!options.Currency) throw new Error('no Currency');
 		this.symbol = options.Currency.toLowerCase() + '_' + options.BaseCurrency.toLowerCase();
 		this.options.Symbol = this.symbol;
 		this.options.onConnect = () => {
@@ -164,7 +156,7 @@ class EXCHANGE {
 			}
 
 			data = {
-				Asks: R.sort( R.descend( R.prop('Price') ), asks),
+				Asks: R.sort( R.ascend( R.prop('Price') ), asks),
 				Bids: R.sort( R.descend( R.prop('Price') ), bids)
 			};
 		} else {

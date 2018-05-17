@@ -72,7 +72,7 @@ class OKEX {
 	}
 
 	GetTicker(contract_type) {
-		return this.fetch(`future_ticker.do?symbol=${this.symbol}&contract_type=${contract_type||this.options.DefaultContactType}`, null, 'GET').then(data => {
+		return this.fetch(`future_ticker.do?symbol=${this.symbol}&contract_type=${contract_type || this.options.DefaultContactType}`, null, 'GET').then(data => {
 			return Promise.resolve({
 				High: N.parse(data.ticker.high),
 				Low: N.parse(data.ticker.low),
@@ -148,7 +148,7 @@ class OKEX {
 		if (!size) size = 30;
 		if (size) params.push('size=' + size);
 		if (merge) params.push('merge=' + merge);
-		params.push('contract_type=' + (contract_type||this.options.DefaultContactType));
+		params.push('contract_type=' + (contract_type || this.options.DefaultContactType));
 
 		return this.fetch('future_depth.do?' + params.join('&'), null, 'GET').then(data => {
 

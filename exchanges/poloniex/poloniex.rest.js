@@ -1,4 +1,4 @@
-const md5 = require('md5');
+const md5 = s => crypto.createHash('md5').update(s).digest('hex');
 const sha1 = require('sha1');
 const crypto = require('crypto');
 const fetch = require('node-fetch');
@@ -36,21 +36,21 @@ class Poloniex {
 		let sortedParams = R.compose(
 			R.join('&'), 
 			R.sort(R.ascend(R.identity)), 
-			R.map(a=>a[0]+'='+encodeURIComponent(a[1])), 
+			R.map(a => a[0] + '=' + encodeURIComponent(a[1])), 
 			R.toPairs
 		)(params);
 
 		if (!isPublic) {
 			let hashedSecret = md5(this.secret);
 			let hash = crypto.createHmac('sha256', Buffer.from(hashedSecret, 'utf8')).update(sortedParams).digest('hex');
-			sortedParams += '&signature='+encodeURIComponent(hash);
+			sortedParams += '&signature=' + encodeURIComponent(hash);
 		}
 		
-		let url = 'https://poloniex.com'+method;
+		let url = 'https://poloniex.com' + method;
 		let headers = {};
 		let body = '';
 		if (httpMethod === 'GET') {
-			url += '?'+sortedParams;
+			url += '?' + sortedParams;
 		} else {
 			body = sortedParams;
 			headers['Content-Type'] = 'application/x-www-form-urlencoded';
@@ -59,7 +59,7 @@ class Poloniex {
 		//公共接口添加防缓存机制
 		if (isPublic) {
 			let sep = url.indexOf('?') === -1 ? '?' : '&';
-			url += sep+'_t='+Date.now();
+			url += sep + '_t=' + Date.now();
 		}
 
 		// console.info('<<',httpMethod, url, JSON.stringify(body || 'nobody'));
@@ -68,28 +68,28 @@ class Poloniex {
 			timeout: httpMethod === 'GET' ? 5000 : 10000,
 			body,
 			headers
-		}).then(res=>res.text()).then(s=>{
+		}).then(res => res.text()).then(s => {
 			// console.info('>>',s);
 			let data = null;
 			try {
 				data = JSON.parse(s);
-			} catch(err) {
-				console.error('Poloniex rest can not parse json:'+s);
+			} catch (err) {
+				console.error('Poloniex rest can not parse json:' + s);
 				throw err;
 			}
 			if (data && data.result === false && data.code) {
-				throw new Error('code='+data.code+' msg='+this.errorCode(data.code));
+				throw new Error('code=' + data.code + ' msg=' + this.errorCode(data.code));
 			}
 			return data;
 		});
 	}
 
 	error(...args) {
-		args = args.map(a=>{
+		args = args.map(a => {
 			if (typeof a === 'object') a = JSON.stringify(a);
 			return a;
-		})
-		throw new Error( '['+moment().format('YYYY-MM-DD HH:mm:ss')+'] '+this.GetName()+': '+args.join(' '));
+		});
+		throw new Error( '[' + moment().format('YYYY-MM-DD HH:mm:ss') + '] ' + this.GetName() + ': ' + args.join(' '));
 	}
 
 	get(method, params, isPublic) {
@@ -104,7 +104,7 @@ class Poloniex {
 	GetTicker() {
 		return this.get('/api/v1/ticker/', {
 			coin: this.symbol
-		}, true).then(ticker=>{
+		}, true).then(ticker => {
 			return {
 				High: N.parse(ticker.high, 2),
 				Low: N.parse(ticker.low, 2),
@@ -123,21 +123,21 @@ class Poloniex {
 			command: 'returnOrderBook',
 			currencyPair: this.symbol,
 			depth
-		}, true).then(tick=>{
-			if (!tick || !tick.asks || !tick.bids) throw new Error('get Poloniex '+this.symbol+' depth error '+JSON.stringify(tick));
+		}, true).then(tick => {
+			if (!tick || !tick.asks || !tick.bids) throw new Error('get Poloniex ' + this.symbol + ' depth error ' + JSON.stringify(tick));
 
-			tick.bids = tick.bids.map(b=>{
+			tick.bids = tick.bids.map(b => {
 				return {
 					Price: N.parse(b[0]),
 					Amount: N.parse(b[1])
 				};
 			});
 
-			tick.asks = tick.asks.map(a=>{
+			tick.asks = tick.asks.map(a => {
 				return {
 					Price: N.parse(a[0]),
 					Amount: N.parse(a[1])
-				}
+				};
 			});
 
 			return Promise.resolve({
@@ -169,7 +169,7 @@ class Poloniex {
 		return this.post('/api/v1/trade_cancel/', {
 			coin: this.symbol,
 			id: orderId
-		}).then(r=>{
+		}).then(r => {
 			return (r && r.result);
 		});
 	}
@@ -180,7 +180,7 @@ class Poloniex {
 			amount,
 			price,
 			type
-		}).then( r=>{
+		}).then( r => {
 			if (r && r.result && r.id) return r.id;
 			throw new Error(JSON.stringify(r));
 		});
@@ -219,7 +219,7 @@ class Poloniex {
 			'404': 'IP限制不能请求该资源',
 			'405': '币种交易暂时关闭',
 		};
-		code = code+'';
+		code = code + '';
 		return errors[code] || code;
 	}
 

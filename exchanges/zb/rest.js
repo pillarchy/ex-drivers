@@ -1,13 +1,9 @@
 const N = require('precise-number');
-const { ok, equal } = require('assert');
-const WebSocket = require('../../lib/auto-reconnect-ws.js');
+const { ok } = require('assert');
 const R = require('ramda');
 const sha1 = require('sha1');
 const crypto = require('crypto');
-const delay = require('delay');
 const fetch = require('zkt-fetch');
-const clor = require("clor");
-const qs = require('querystring');
 const debug = require('debug')('exchange:zb:rest');
 const debugOrder = require('debug')('order');
 
@@ -58,14 +54,14 @@ class EXCHANGE {
 			params.accesskey = this.options.Key;
 			params.method = _params.method;
 			delete(_params.method);
-			for(var key in _params) params[key] = _params[key];
+			for (let key in _params) params[key] = _params[key];
 
 			params.sign = sign(params, this.options.Secret);
 			params.reqTime = Date.now();
 
 			let vars = [];
-			for(let key in params) {
-				vars.push(key+'='+encodeURIComponent(params[key]));
+			for (let key in params) {
+				vars.push(key + '=' + encodeURIComponent(params[key]));
 			}
 			debug('<<<', params);
 
@@ -144,7 +140,7 @@ class EXCHANGE {
 			method: `cancelOrder`,
 			currency: this._getSymbol(currency),
 			id: orderId
-		}).then(a=>a && a.code * 1 === 1000);
+		}).then(a => a && a.code * 1 === 1000);
 	}
 
 	async GetOrders(currency) {
@@ -197,11 +193,11 @@ class EXCHANGE {
 		function _order_status(o) {
 			//(0：待成交,1：取消,2：交易完成,3：待成交未交易部份)
 			switch (o) {
-				case 0: return 'Pending';
-				case 1: return 'Cancelled';
-				case 2: return 'Closed';
-				case 3: return 'Partial';
-				default: return 'Unknown';
+					case 0: return 'Pending';
+					case 1: return 'Cancelled';
+					case 2: return 'Closed';
+					case 3: return 'Partial';
+					default: return 'Unknown';
 			}
 		}
 		debugOrder('original order', JSON.stringify(o));
@@ -223,7 +219,7 @@ class EXCHANGE {
 	GetDepth(size, merge) {
 		if (!size) size = 30;
 		let url = `http://api.bitkk.com/data/v1/depth?size=${size}&market=${this.symbol}`;
-		if (merge) url += '&merge='+merge;
+		if (merge) url += '&merge=' + merge;
 
 		debug('get depth url = ', url);
 		return fetch(url).then(r => r.json()).then(data => {
@@ -234,19 +230,19 @@ class EXCHANGE {
 				return {
 					Price: N.parse(pair[0]),
 					Amount: N.parse(pair[1])
-				}
+				};
 			});
 
 			let bids = data.bids.map(pair => {
 				return {
 					Price: N.parse(pair[0]),
 					Amount: N.parse(pair[1])
-				}
+				};
 			});
 
 			let depth = {
 				Asks: R.sort( R.descend( R.prop('Price') ), asks).slice(-20),
-				Bids: R.sort( R.descend( R.prop('Price') ), bids).slice(0,20)
+				Bids: R.sort( R.descend( R.prop('Price') ), bids).slice(0, 20)
 			};
 
 			return depth;
@@ -273,10 +269,12 @@ class EXCHANGE {
 
 
 function sign(params, secret) {
-	var arr = [];
-	for(var key in params) arr.push(key+'='+encodeURIComponent(params[key]));
+	let arr = [];
+	for (let key in params) {
+		arr.push(key + '=' + encodeURIComponent(params[key]));
+	}
 	arr = arr.sort();
-	var body = arr.join('&');
+	let body = arr.join('&');
 	secret = sha1(secret);
 	return hash_hmac(body, secret);
 }

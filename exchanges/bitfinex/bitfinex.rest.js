@@ -18,7 +18,7 @@ class Bitfinex {
 		this.secret = options.Secret;
 		if (!options.Currency) options.Currency = 'BTC';
 		this.options = options;
-		this.symbol = options.Currency.toLowerCase()+'usd';
+		this.symbol = options.Currency.toLowerCase() + 'usd';
 	}
 
 	fetch(url, params, method, isPublic) {
@@ -44,7 +44,7 @@ class Bitfinex {
 		}
 
 		if (this.debug) {
-			console.log('<< '+method+' '+completeURL+'  BODY:'+"\n"+body);
+			console.log('<< ' + method + ' ' + completeURL + '  BODY:' + "\n" + body);
 		}
 
 		let httpMethod = method ? method : 'POST';
@@ -54,20 +54,20 @@ class Bitfinex {
 			timeout: httpMethod === 'GET' ? 10000 : 10000,
 			body,
 			headers
-		}).then(res=>res.text()).then(t=>{
+		}).then(res => res.text()).then(t => {
 			if (this.debug) {
-				console.log('>>'+t);
+				console.log('>>' + t);
 			}
-			if (!t) return Promise.reject('Bitfinex returns empty: '+url);
+			if (!t) return Promise.reject('Bitfinex returns empty: ' + url);
 			try {
-				var d = JSON.parse(t);
+				let d = JSON.parse(t);
 				if (Object.keys(d).length === 1 && d.message) {
 					return Promise.reject(d.message);
 				} else {
 					return Promise.resolve(d);
 				}
-			} catch( err ) {
-				return Promise.reject('Bitfinex JSON parse error: '+t);
+			} catch ( err ) {
+				return Promise.reject('Bitfinex JSON parse error: ' + t);
 			}
 		});
 
@@ -142,7 +142,7 @@ class Bitfinex {
 	// }
 
 	GetTicker() {
-		return this.fetch('/v1/pubticker/'+this.symbol, null, 'GET', true).then(data=>{
+		return this.fetch('/v1/pubticker/' + this.symbol, null, 'GET', true).then(data => {
 			return Promise.resolve({
 				High: N.parse(data.high),
 				Low: N.parse(data.low),
@@ -166,22 +166,22 @@ class Bitfinex {
 		merge = !merge ? '0' : '1';
 		params.merge = merge;
 
-		return this.fetch('/v1/book/'+this.symbol, params, 'GET', true).then(data=>{
+		return this.fetch('/v1/book/' + this.symbol, params, 'GET', true).then(data => {
 
-			if (!data || !data.bids || !data.asks) throw new Error('get bitfinex '+this.symbol+' depth error '+JSON.stringify(data));
+			if (!data || !data.bids || !data.asks) throw new Error('get bitfinex ' + this.symbol + ' depth error ' + JSON.stringify(data));
 
-			let asks = data.asks.map(r=>{
+			let asks = data.asks.map(r => {
 				return {
 					Price: N.parse(r.price),
 					Amount: N.parse(r.amount)
-				}
+				};
 			});
 
-			let bids = data.bids.map(r=>{
+			let bids = data.bids.map(r => {
 				return {
 					Price: N.parse(r.price),
 					Amount: N.parse(r.amount)
-				}
+				};
 			});
 
 			return Promise.resolve({
@@ -193,7 +193,7 @@ class Bitfinex {
 
 
 	GetAccount() {
-		return this.fetch('/v1/balances', null, 'POST').then(accounts=>{
+		return this.fetch('/v1/balances', null, 'POST').then(accounts => {
 
 			// console.log(JSON.stringify(accounts));
 
@@ -216,7 +216,7 @@ class Bitfinex {
 						re.FrozenBalance = N.minus(account.amount, account.available);
 					}
 
-					re[(account.currency+'').toUpperCase()] = {
+					re[(account.currency + '').toUpperCase()] = {
 						Available: N.parse(account.available),
 						Frozen: N.minus(account.amount, account.available)
 					};
@@ -266,15 +266,15 @@ class Bitfinex {
 	Trade(side, price, amount, type) {
 		let params = {
 			symbol: this.symbol,
-			price: price+'',
-			amount: amount+'',
+			price: price + '',
+			amount: amount + '',
 			side,
 			type
 		};
 		/*
 		{"id":4086495264,"cid":33145897920,"cid_date":"2017-10-01","gid":null,"symbol":"ethusd","exchange":"bitfinex","price":"330.0","avg_execution_price":"0.0","side":"buy","type":"exchange limit","timestamp":"1506849145.977395953","is_live":true,"is_cancelled":false,"is_hidden":false,"oco_order":null,"was_forced":false,"original_amount":"0.05","remaining_amount":"0.05","executed_amount":"0.0","src":"api","order_id":4086495264}
 		 */
-		return this.fetch('/v1/order/new', params, 'POST').then(r=>{
+		return this.fetch('/v1/order/new', params, 'POST').then(r => {
 			if (r && r.order_id) return r.order_id;
 			throw new Error(JSON.stringify(r));
 		});

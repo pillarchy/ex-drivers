@@ -1,12 +1,23 @@
 const { ok } = require('assert');
 const wait = require('delay');
+const RateLimiter = require('../lib/rate-limit');
 
 class EXCHANGE {
 	constructor(options) {
+		if (!options) options = {};
 		ok(options.Currency, 'no Currency in options');
 		ok(options.BaseCurrency, 'no BaseCurrency in options');
 		ok(options.Name, 'no Name in options');
 		ok(options.Fees, 'no Fees in options');
+
+		options = Object.assign({
+			RateLimit: 10,
+			RateLimitInterval: 1000
+		}, options);
+
+		if (!options.rateLimiter && options.RateLimit && options.RateLimitInterval) {
+			options.rateLimiter = new RateLimiter(options.RateLimitInterval, options.RateLimit);
+		}
 
 		this.options = options;
 		this.wsReady = false;

@@ -7,11 +7,11 @@ let ex = new EX({
 	Secret: config.hitbtc.secret,
 	Currency: 'BTC',
 	isWS: true,
-	onDepth: (depth)=>{
+	onDepth: (depth) => {
 		//console.log(depth);
 	},
 	onPong: (t) => {
-		console.log('pong', t+'ms');
+		console.log('pong', t + 'ms');
 	}
 });
 

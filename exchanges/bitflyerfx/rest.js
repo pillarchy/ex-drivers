@@ -93,7 +93,7 @@ class REST {
 	Trade(type, price, amount) {
 		let params = {
 			symbol: this.coin_type,
-			type: type,
+			type,
 			price,
 			amount
 		};
@@ -125,8 +125,8 @@ class REST {
 		return this.fetch({
 			method: 'buy',
 			coin_type: this.coin_type,
-			price: price,
-			amount: amount
+			price,
+			amount
 		});
 	}
 
@@ -134,8 +134,8 @@ class REST {
 		return this.fetch({
 			method: 'sell',
 			coin_type: this.coin_type,
-			price: price,
-			amount: amount
+			price,
+			amount
 		});
 	}
 
@@ -143,7 +143,7 @@ class REST {
 		return this.fetch({
 			method: 'buy_market',
 			coin_type: this.coin_type,
-			amount: amount
+			amount
 		});
 	}
 
@@ -152,7 +152,7 @@ class REST {
 		return this.fetch({
 			method: 'sell_market',
 			coin_type: this.coin_type,
-			amount: amount
+			amount
 		});
 	}
 

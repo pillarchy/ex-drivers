@@ -234,10 +234,10 @@ class Huobi {
 			if (!r.data) this.error('can not cancel order:', orderId, r);
 			return true;
 		}).catch(err => {
-            if (err && err.code === 'order-orderstate-error') {
-                console.log('cancel a cancelled order');
-                return true;
-            }
+			if (err && err.code === 'order-orderstate-error') {
+				console.log('cancel a cancelled order');
+				return true;
+			}
 			if (err && err.message && err.message.indexOf('order-orderstate-error') > 0) {
 				console.log('cancel a cancelled order');
 				return true;

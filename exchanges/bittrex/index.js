@@ -11,7 +11,7 @@ class EXCHANGE {
 		this.Currency = options.Currency;
 		this.BaseCurrency = options.BaseCurrency;
 		this.options = options;
-		this.symbol = this.BaseCurrency+'-'+this.Currency;
+		this.symbol = this.BaseCurrency + '-' + this.Currency;
 	
 		this.fee = {
 			Maker: 0.2,
@@ -81,7 +81,7 @@ class EXCHANGE {
 
 					if (!initiated) {
 						queryOrderBook();
-						setInterval(()=>{
+						setInterval(() => {
 							queryOrderBook();
 						}, 20000);
 						initiated = true;
@@ -96,7 +96,7 @@ class EXCHANGE {
 									if (data_for.MarketName === this.symbol) this.updateOrderBook(data_for);
 								});
 							}
-						})
+						});
 					}
 
 				} catch ( err ) {}
@@ -109,10 +109,10 @@ class EXCHANGE {
 	buildOrderBook(data) {
 		//console.log('build order book');
 		this.orderbook = { Asks:{}, Bids:{}};
-		data.Sells.map(r=>{
+		data.Sells.map(r => {
 			this.orderbook.Asks[r.Rate] = r.Quantity;
 		});
-		data.Buys.map(r=>{
+		data.Buys.map(r => {
 			this.orderbook.Bids[r.Rate] = r.Quantity;
 		});
 		return this.orderbook;
@@ -169,27 +169,27 @@ class EXCHANGE {
 			return {
 				Price: N.parse(price),
 				Amount: N.parse(this.orderbook.Asks[price])
-			}
-		}).filter(d=>d.Amount > 0);
+			};
+		}).filter(d => d.Amount > 0);
 
 		let bids = Object.keys(this.orderbook.Bids).map(price => {
 			return {
 				Price: N.parse(price),
 				Amount: N.parse(this.orderbook.Bids[price])
-			}
-		}).filter(d=>d.Amount > 0);
+			};
+		}).filter(d => d.Amount > 0);
 
 		this.orderbook = { Asks:{}, Bids:{}};
-		asks.map(r=>{
+		asks.map(r => {
 			this.orderbook.Asks[r.Price] = r.Amount;
 		});
-		bids.map(r=>{
+		bids.map(r => {
 			this.orderbook.Bids[r.Price] = r.Amount;
 		});
 
 		let depth = {
 			Asks: R.sort( R.descend( R.prop('Price') ), asks).slice(-20),
-			Bids: R.sort( R.descend( R.prop('Price') ), bids).slice(0,20)
+			Bids: R.sort( R.descend( R.prop('Price') ), bids).slice(0, 20)
 		};
 
 		this.onDepthData(depth);
@@ -200,7 +200,7 @@ class EXCHANGE {
 		// console.log('waiting...');
 		return new Promise((done, reject) => {
 			this.wsReadyCallback = done;
-			setTimeout(()=>{
+			setTimeout(() => {
 				delete(this.wsReadyCallback);
 				reject();
 			}, 30000);
@@ -235,7 +235,7 @@ class EXCHANGE {
 	}
 
 	GetTicker() {
-		return this.rest('getticker',{ market : this.symbol }).then(data=>{
+		return this.rest('getticker', { market : this.symbol }).then(data => {
 			return {
 				Buy: N.parse(data.Bid),
 				Sell: N.parse(data.Ask),
@@ -244,7 +244,7 @@ class EXCHANGE {
 				High: N.parse(data.Ask),
 				Low: N.parse(data.Bid)
 			};
-		})
+		});
 	}
 
 	GetDepth(size) {
@@ -253,39 +253,39 @@ class EXCHANGE {
 			market: this.symbol,
 			depth: 10,
 			type: 'both'
-		}).then(data=>{
-			if (!data || !data.buy || !data.sell) throw new Error('get bittrex '+this.symbol+' depth error '+JSON.stringify(data));
+		}).then(data => {
+			if (!data || !data.buy || !data.sell) throw new Error('get bittrex ' + this.symbol + ' depth error ' + JSON.stringify(data));
 
-			let asks = data.sell.map(r=>{
+			let asks = data.sell.map(r => {
 				return {
 					Price: N.parse(r.Rate),
 					Amount: N.parse(r.Quantity)
-				}
+				};
 			});
 
-			let bids = data.buy.map(r=>{
+			let bids = data.buy.map(r => {
 				return {
 					Price: N.parse(r.Rate),
 					Amount: N.parse(r.Quantity)
-				}
+				};
 			});
 
 			return Promise.resolve({
 				Asks: R.sort( R.descend( R.prop('Price') ), asks).slice(-size),
-				Bids: R.sort( R.descend( R.prop('Price') ), bids).slice(0,size)
+				Bids: R.sort( R.descend( R.prop('Price') ), bids).slice(0, size)
 			});
 		});
 	}
 
 	GetAccount() {
-		return this.rest('getbalances').then(accounts=>{
+		return this.rest('getbalances').then(accounts => {
 			let re = {
 				Balance: 0,
 				FrozenBalance: 0,
 				Stocks: 0,
 				FrozenStocks: 0
 			};
-			accounts.map(account=>{
+			accounts.map(account => {
 				if (account.Currency === this.Currency) {
 					re.Stocks = account.Available;
 					re.FrozenStocks = N.minus(account.Balance, account.Available);
@@ -323,7 +323,7 @@ class EXCHANGE {
 		 */
 		return this.rest('getopenorders', {
 			market: this.symbol
-		}).then(orders => orders.map(o=> {
+		}).then(orders => orders.map(o => {
 			return {
 				Id: o.OrderUuid,
 				Price: N.parse(o.Limit),
@@ -390,9 +390,9 @@ class EXCHANGE {
 			market: this.symbol,
 			quantity: amount,
 			rate: price
-		}).then( r=> {
+		}).then( r => {
 			if (r && r.uuid) return r.uuid;
-			throw new Error(this.GetName()+' buy failed '+JSON.stringify(r));
+			throw new Error(this.GetName() + ' buy failed ' + JSON.stringify(r));
 		});
 	}
 
@@ -404,27 +404,27 @@ class EXCHANGE {
 			market: this.symbol,
 			quantity: amount,
 			rate: price
-		}).then( r=> {
+		}).then( r => {
 			if (r && r.uuid) return r.uuid;
-			throw new Error(this.GetName()+' sell failed '+JSON.stringify(r));
+			throw new Error(this.GetName() + ' sell failed ' + JSON.stringify(r));
 		});
 	}
 
 	CancelOrder(orderId) {
 		return this.rest('cancel', {
 			uuid: orderId
-		}).then(result=>{
+		}).then(result => {
 			return true;
 		});
 	}
 
 	CancelPendingOrders() {
 		console.log('cancelling pending orders...');
-		return this.GetOrders().then( orders=>{
-			console.log('cancelling',orders.length,'orders');
-			return Promise.all(orders.map( o=> {
+		return this.GetOrders().then( orders => {
+			console.log('cancelling', orders.length, 'orders');
+			return Promise.all(orders.map( o => {
 				return this.CancelOrder(o.Id);
-			})).then( results=>{
+			})).then( results => {
 				console.log(results);
 				return true;
 			});

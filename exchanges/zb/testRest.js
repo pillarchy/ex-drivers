@@ -19,7 +19,7 @@ describe('test zb rest', function() {
 	// it('should get account', () => zb.GetAccount().then(log));
 
 	// it('should get ticker', ()=>zb.GetTicker().then(log));
-	it('should get depth', ()=>zb.GetDepth().then(log));
+	it('should get depth', () => zb.GetDepth().then(log));
 
 
 });

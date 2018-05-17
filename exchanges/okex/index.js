@@ -3,26 +3,28 @@ const EXCHANGE_WS = require('./ws.js');
 const N = require('precise-number');
 const { ok } = require('assert');
 const DelayTrigger = require('../../lib/delay-trigger.js');
+const EXCHANGE = require('../exchange.js');
 
-class EXCHANGE {
+class OKEX extends EXCHANGE {
 	constructor(options) {
-		if (!options.Currency) throw new Error('no Currency');
-		if (!options.BaseCurrency) throw new Error('no BaseCurrency');
-		this.Currency = options.Currency;
-		this.BaseCurrency = options.BaseCurrency;
-		this.options = Object.assign({
+		options = Object.assign({
+			Name: 'OKEX',
+			Fees: {
+				Maker: 0.002,
+				Taker: 0.002
+			},
+			RateLimit: 10,
 			Decimals: 8,
 			StockDecimals: 3,
 			MinTradeStocks: 0.0000001
 		}, options);
-		
-		this.rest = new EXCHANGE_REST(options);
-	
-		this.fee = {
-			Maker: 0.15,
-			Taker: 0.2
-		};
+		super(options);
 
+		this.Currency = options.Currency;
+		this.BaseCurrency = options.BaseCurrency;
+		
+		this.rest = new EXCHANGE_REST(this.options);
+	
 		if (options.isWS) {
 			let wsOptions = Object.assign({}, options);
 			this.delayTrigger = new DelayTrigger(300);
@@ -91,10 +93,6 @@ class EXCHANGE {
 		return this.ws.waitUntilWSReady();	
 	}
 
-	GetName() {
-		return this.options.Name ? this.options.Name : 'OKEX';
-	}
-
 	GetAccount() {
 		return this.rest.GetAccount().then( data => {
 			let base = this.options.BaseCurrency.toLowerCase();
@@ -137,11 +135,6 @@ class EXCHANGE {
 			}
 			return Promise.resolve(orders);
 		});
-	}
-
-	GetMin() {
-		if (this.options.MinTradeAmount) return this.options.MinTradeAmount;
-		return 0.01;
 	}
 
 	Buy(price, amount) {
@@ -231,4 +224,4 @@ class EXCHANGE {
 }
 
 
-module.exports = EXCHANGE;
+module.exports = OKEX;

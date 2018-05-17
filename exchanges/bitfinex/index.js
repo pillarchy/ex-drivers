@@ -1,46 +1,29 @@
 const EXCHANGE_REST = require('./bitfinex.rest.js');
 const EXCHANGE_WS = require('./bitfinex.ws.js');
 const N = require('precise-number');
-const { ok, equal } = require('assert');
+const { ok } = require('assert');
+const wait = require('delay');
+const EXCHANGE = require('../exchange.js');
 
-class EXCHANGE {
+class BITFINEX extends EXCHANGE {
 	constructor(options) {
-		if (!options.Currency) options.Currency = 'BTC';
-		this.Currency = options.Currency;
+		options = Object.assign({
+			Name: 'Bitfinex',
+			Fees: {
+				Maker: 0.002,
+				Taker: 0.002
+			},
+			RateLimit: 10
+		}, options);
+		super(options);
 
-		//默认使用市价单
-		if (options.always_trade_market === undefined) options.always_trade_market = true;
+		this.Currency = this.options.Currency;
 
-		this.options = options;
-		this.rest = new EXCHANGE_REST(options);
+		this.rest = new EXCHANGE_REST(this.options);
 
-		if (options.isWS) {
-			this.ws = new EXCHANGE_WS(options);
+		if (this.options.isWS) {
+			this.ws = new EXCHANGE_WS(this.options);
 		}
-	
-		this.fee = {
-			BuyMaker: 0.2,
-			SellMaker: 0.2,
-			BuyTaker: 0.2,
-			SellTaker: 0.2
-		};
-	}
-
-	SetFee(fee) {
-		ok(fee, 'no fee');
-		ok(fee.BuyMaker);
-		ok(fee.BuyTaker);
-		ok(fee.SellMaker);
-		ok(fee.BuyMaker);
-		this.fee = fee;
-	}
-
-	GetFee() {
-		return this.fee;
-	}
-
-	GetName() {
-		return this.options.Name ? this.options.Name : 'Bitfinex';
 	}
 
 	getHandler() {
@@ -101,12 +84,12 @@ class EXCHANGE {
 
 	async CancelPendingOrders() {
 		let n = 0;
-		while( true ) {
+		while ( true ) {
 			try {
 				let a = await this.rest.CancelAllOrders();
 				break;
 			} catch ( err ) {
-				await wait(n*1000);
+				await wait(n * 1000);
 			}
 			n++;
 			if (n > 20) {
@@ -190,8 +173,4 @@ class EXCHANGE {
 
 }
 
-function wait(ms) {
-	return new Promise( d => setTimeout(d, ms) );
-}
-
-module.exports = EXCHANGE;
+module.exports = BITFINEX;

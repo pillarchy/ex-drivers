@@ -1,59 +1,35 @@
-
 const EXCHANGE_REST = require('./huobipro.rest.js');
 const EXCHANGE_WS = require('./huobipro.ws.js');
 const N = require('precise-number');
 const R = require('ramda');
+const EXCHANGE = require('../exchange.js');
 
-class EXCHANGE {
+class HUOBI extends EXCHANGE {
 	constructor(options) {
-		if (!options.Currency) options.Currency = 'BTC';
-		if (!options.BaseCurrency) options.BaseCurrency = 'USDT';
-		if (!options.Decimals) options.Decimals = 2;
-		if (!options.MinTradeStocks) options.MinTradeStocks = 0.001;
-		if (options.StockDecimals === undefined) options.StockDecimals = 4;
-
+		options = Object.assign({
+			Name: 'Huobi',
+			Fees: {
+				Maker: 0.002,
+				Taker: 0.002
+			},
+			RateLimit: 10,
+			Decimals: 2,
+			MinTradeStocks: 0.001,
+			StockDecimals: 4
+		}, options);
 		options.domain = options.hadax ? 'api.hadax.com' : 'api.huobipro.com';
-
-		this.options = options;
+		super(options);
 
 		this.isWS = options.isWS;
 		if (this.isWS) {
-			this.ws = new EXCHANGE_WS(options);
+			this.ws = new EXCHANGE_WS(this.options);
 		}
-		this.rest = new EXCHANGE_REST(options);
-		this.fee = {
-			BuyMaker: 0.2,
-			SellMaker: 0.2,
-			BuyTaker: 0.2,
-			SellTaker: 0.2
-		};
+		this.rest = new EXCHANGE_REST(this.options);
 	}
 
 	waitUntilWSReady() {
-		if (!this.ws) {
-			return false;
-		}
+		if (!this.ws) return false;
 		return this.ws.waitUntilWSReady();
-	}
-
-	GetMin() {
-		return this.options.MinTradeStocks;
-	}
-
-	GetFee() {
-		return this.fee;
-	}
-
-	SetFee(fee) {
-		this.fee = fee;
-	}
-
-	GetName() {
-		return this.options.Name ? this.options.Name : 'HuobiPro';
-	}
-
-	GetOptions() {
-		return this.options;
 	}
 
 	getHandler() {
@@ -96,7 +72,7 @@ class EXCHANGE {
 			});
 
 			return Promise.resolve({
-				Asks: R.sort( R.descend( R.prop('Price') ), tick.asks),
+				Asks: R.sort( R.ascend( R.prop('Price') ), tick.asks),
 				Bids: R.sort( R.descend( R.prop('Price') ), tick.bids)
 			});
 		});
@@ -188,7 +164,7 @@ class EXCHANGE {
 	CancelPendingOrders() {
 		return this.GetOrders().then(async orders => {
 			let ids = orders.map(o => o.Id);
-            console.log('cancelling', ids);
+			console.log('cancelling', ids);
 			while (ids && ids.length > 0) {
 				let _ids = ids.splice(0, 50);
 				await this.rest.CancelOrders(_ids);
@@ -228,4 +204,4 @@ class EXCHANGE {
 }
 
 
-module.exports = EXCHANGE;
+module.exports = HUOBI;

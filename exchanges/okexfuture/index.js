@@ -201,7 +201,7 @@ class EXCHANGE {
 				return re;
 			}
 
-			throw new Error('error position response: '+JSON.stringify(d))
+			throw new Error('error position response: ' + JSON.stringify(d));
 		});
 	}
 
@@ -278,7 +278,7 @@ class EXCHANGE {
 		if (!contract_type) contract_type = this.options.DefaultContactType;
 		this._check_contract_type(contract_type);
 		if (['Long', 'Short', 'CloseLong', 'CloseShort'].indexOf(direction) === -1) {
-			throw new Error('unknown direction: ' + direction +', direction should be one of these values: Long Short CloseLong CloseShort');
+			throw new Error('unknown direction: ' + direction + ', direction should be one of these values: Long Short CloseLong CloseShort');
 		}
 		ok( amount > 0, 'amount should greater than 0');
 

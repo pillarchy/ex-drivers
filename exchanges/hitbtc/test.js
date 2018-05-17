@@ -7,7 +7,7 @@ let ex = new EX({
 	Secret: config.hitbtc.secret,
 	Currency: 'BTC',
 	isWS: true,
-	onDepth: (depth)=>{
+	onDepth: (depth) => {
 		console.log(depth);
 	}
 });
@@ -80,7 +80,7 @@ describe('test HitBTC', function() {
 	// it('should get account', ()=>ex.GetAccount().then(log));
 
 
-	it('should wait for a long time', function(){
+	it('should wait for a long time', function() {
 		this.timeout(1000000000);
 		return wait(1000000000);
 	});

@@ -102,19 +102,19 @@ class EXCHANGE {
 			return {
 				Price: N.parse(pair[0]),
 				Amount: N.parse(pair[1])
-			}
+			};
 		});
 
 		let bids = data.bids.map(pair => {
 			return {
 				Price: N.parse(pair[0]),
 				Amount: N.parse(pair[1])
-			}
+			};
 		});
 
 		let depth = {
 			Asks: R.sort( R.descend( R.prop('Price') ), asks).slice(-20),
-			Bids: R.sort( R.descend( R.prop('Price') ), bids).slice(0,20)
+			Bids: R.sort( R.descend( R.prop('Price') ), bids).slice(0, 20)
 		};
 
 		this.options.onDepth(depth);
@@ -162,7 +162,7 @@ class EXCHANGE {
 
 	handleOnce(data) {
 		if (data && data.channel && data.no) {
-			let key = data.channel+','+data.no;
+			let key = data.channel + ',' + data.no;
 			if (this.tmpHandlers[key]) {
 				this.tmpHandlers[key](data);
 				delete(this.tmpHandlers[key]);
@@ -267,17 +267,17 @@ class EXCHANGE {
 		return this.request({
 			channel: `${this.symbol}_cancelorder`,
 			id: orderId
-		}).then(a=>a && a.success);
+		}).then(a => a && a.success);
 	}
 
 	async CancelPendingOrders() {
 		let n = 0;
-		while( true ) {
+		while ( true ) {
 			try {
 				let a = await this.rest.CancelAllOrders();
 				break;
 			} catch ( err ) {
-				await wait(n*1000);
+				await wait(n * 1000);
 			}
 			n++;
 			if (n > 20) {
@@ -329,11 +329,11 @@ class EXCHANGE {
 		function _order_status(o) {
 			//(0：待成交,1：取消,2：交易完成,3：待成交未交易部份)
 			switch (o) {
-				case 0: return 'Pending';
-				case 1: return 'Cancelled';
-				case 2: return 'Closed';
-				case 3: return 'Partial';
-				default: return 'Unknown';
+					case 0: return 'Pending';
+					case 1: return 'Cancelled';
+					case 2: return 'Closed';
+					case 3: return 'Partial';
+					default: return 'Unknown';
 			}
 		}
 

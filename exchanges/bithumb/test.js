@@ -86,21 +86,21 @@ describe('test bithumb rest api', function() {
 
 	// it('should get account info', ()=>Exchange.GetAccount().then(log));
 
-	it('should sell', ()=>{
-		return Exchange.Sell(300, 0.001).then(i=>{
+	it('should sell', () => {
+		return Exchange.Sell(300, 0.001).then(i => {
 			console.log('orderId=', i);
 		});
 	});
 
-	it('should get account info', ()=>Exchange.GetAccount().then(log));
+	it('should get account info', () => Exchange.GetAccount().then(log));
 
-	it('should sell', ()=>{
-		return Exchange.Buy(300, 0.001).then(i=>{
+	it('should sell', () => {
+		return Exchange.Buy(300, 0.001).then(i => {
 			console.log('orderId=', i);
 		});
 	});
 
-	it('should get account info', ()=>Exchange.GetAccount().then(log));
+	it('should get account info', () => Exchange.GetAccount().then(log));
 
 	// it('get order info', ()=>{
 	// 	if (orderId) {

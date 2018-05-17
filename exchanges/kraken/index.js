@@ -54,7 +54,7 @@ class EXCHANGE {
 	Buy(price, amount) {
 		ok( amount > 0, 'amount should greater than 0');
 		console.log(this.GetName(), 'Buy', price, amount);
-		return this.getHandler().Buy(price, amount).then( r=> {
+		return this.getHandler().Buy(price, amount).then( r => {
 			if (r && r.result && r.order_id) {
 				return r.order_id;
 			} else {
@@ -66,7 +66,7 @@ class EXCHANGE {
 	Sell(price, amount) {
 		ok( amount > 0, 'amount should greater than 0');
 		console.log(this.GetName(), 'Sell', price, amount);
-		return this.getHandler().Sell(price, amount).then( r=> {
+		return this.getHandler().Sell(price, amount).then( r => {
 			if (r && r.result && r.order_id) {
 				return r.order_id;
 			} else {
@@ -76,19 +76,19 @@ class EXCHANGE {
 	}
 
 	CancelOrder(orderId) {
-		return this.getHandler().CancelOrder(orderId).then(result=>{
+		return this.getHandler().CancelOrder(orderId).then(result => {
 			if (result && (result.result == true || result.result == 'true')) return true;
-			throw new Error('cancel order failed, result: '+JSON.stringify(result));
+			throw new Error('cancel order failed, result: ' + JSON.stringify(result));
 		});
 	}
 
 	CancelPendingOrders() {
 		console.log('cancelling pending orders...');
-		return this.GetOrders().then( orders=>{
-			console.log('cancelling',orders.length,'orders');
-			return Promise.all(orders.map( o=> {
+		return this.GetOrders().then( orders => {
+			console.log('cancelling', orders.length, 'orders');
+			return Promise.all(orders.map( o => {
 				return this.CancelOrder(o.Id);
-			})).then( results=>{
+			})).then( results => {
 				console.log(results);
 				return true;
 			});

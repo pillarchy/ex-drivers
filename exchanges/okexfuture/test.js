@@ -23,10 +23,10 @@ describe('test okex rest api', function () {
 	this.timeout(30000);
 
 	it('should get ticker', async () => {
-        for(let i =0; i<10; i++) {
-            await Exchange.GetTicker('this_week').then(log);
-        }
-    });
+		for (let i = 0; i < 10; i++) {
+			await Exchange.GetTicker('this_week').then(log);
+		}
+	});
 
 	it('should get depth', () => Exchange.GetDepth('next_week').then(log));
 

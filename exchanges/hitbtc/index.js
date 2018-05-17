@@ -15,7 +15,7 @@ class EXCHANGE {
 		if (!options.Currency) options.Currency = 'BTC';
 		this.Currency = options.Currency;
 		this.options = options;
-		this.symbol = options.Currency+'USD';
+		this.symbol = options.Currency + 'USD';
 
 		this.fee = {
 			BuyMaker: 0.1,
@@ -38,17 +38,17 @@ class EXCHANGE {
 			debugWS('starting websocket');
 			this.ws = new WebSocket('wss://st.hitbtc.com/');
 
-			this.ws.on('open', ()=>{
+			this.ws.on('open', () => {
 				debugWS('connected');
 				if (this.orderbookTimer) clearInterval(this.orderbookTimer);
-				this.ws.send('[1,"orderbook","'+this.symbol+'"]');
+				this.ws.send('[1,"orderbook","' + this.symbol + '"]');
 
-				this.orderbookTimer = setInterval(()=>{
-					this.ws.send('[1,"orderbook","'+this.symbol+'"]');
+				this.orderbookTimer = setInterval(() => {
+					this.ws.send('[1,"orderbook","' + this.symbol + '"]');
 				}, 60000);
 			});
 
-			this.ws.on('message', s=>{
+			this.ws.on('message', s => {
 				try {
 					let [code, type, symbol, data] = JSON.parse(s);
 					if (type === 'orderbook') {
@@ -60,11 +60,11 @@ class EXCHANGE {
 						}
 						//console.log('order book got', 'bids = '+data.bid.length, 'asks = '+data.ask.length);
 					}
-				} catch( err ) {}
+				} catch ( err ) {}
 			});
 
 			if (this.options.onPong) {
-				this.ws.on('pong', (t)=>{
+				this.ws.on('pong', (t) => {
 					//console.log('pong', t+'ms');
 					this.options.onPong(t);
 				});
@@ -77,10 +77,10 @@ class EXCHANGE {
 		if (!data || !data.bid || !data.ask) return;
 		debugWS('build order book');
 		this.orderbook = { Asks:{}, Bids:{}};
-		data.ask.map(r=>{
+		data.ask.map(r => {
 			this.orderbook.Asks[r[0]] = N.parse(r[1]);
 		});
-		data.bid.map(r=>{
+		data.bid.map(r => {
 			this.orderbook.Bids[r[0]] = N.parse(r[1]);
 		});
 		// this.onDepthData();
@@ -126,21 +126,21 @@ class EXCHANGE {
 			return {
 				Price: price,
 				Amount: N.parse(this.orderbook.Asks[price])
-			}
-		}).filter(d=>d.Amount > 0);
+			};
+		}).filter(d => d.Amount > 0);
 
 		let bids = Object.keys(this.orderbook.Bids).map(price => {
 			return {
 				Price: price,
 				Amount: N.parse(this.orderbook.Bids[price])
-			}
-		}).filter(d=>d.Amount > 0);
+			};
+		}).filter(d => d.Amount > 0);
 
 		this.orderbook = { Asks:{}, Bids:{}};
-		asks.map(r=>{
+		asks.map(r => {
 			this.orderbook.Asks[r.Price] = r.Amount;
 		});
-		bids.map(r=>{
+		bids.map(r => {
 			this.orderbook.Bids[r.Price] = r.Amount;
 		});
 
@@ -152,7 +152,7 @@ class EXCHANGE {
 		// console.log('waiting...');
 		return new Promise((done, reject) => {
 			this.wsReadyCallback = done;
-			setTimeout(()=>{
+			setTimeout(() => {
 				debugWS('waitUntilWSReady timeout');
 				delete(this.wsReadyCallback);
 				reject();
@@ -174,19 +174,19 @@ class EXCHANGE {
 				return {
 					Price: N.parse(price),
 					Amount: N.parse(this.orderbook.Asks[price])
-				}
-			}).filter(d=>d.Amount > 0);
+				};
+			}).filter(d => d.Amount > 0);
 
 			let bids = Object.keys(this.orderbook.Bids).map(price => {
 				return {
 					Price: N.parse(price),
 					Amount: N.parse(this.orderbook.Bids[price])
-				}
-			}).filter(d=>d.Amount > 0);
+				};
+			}).filter(d => d.Amount > 0);
 
 			let depth = {
 				Asks: R.sort( R.descend( R.prop('Price') ), asks).slice(-20),
-				Bids: R.sort( R.descend( R.prop('Price') ), bids).slice(0,20)
+				Bids: R.sort( R.descend( R.prop('Price') ), bids).slice(0, 20)
 			};
 
 			this.options.onDepth(depth);
@@ -232,27 +232,27 @@ class EXCHANGE {
 				Low: N.parse(data.low),
 				Volume: N.parse(data.volume)
 			};
-		})
+		});
 	}
 
 	GetDepth() {
 		debug('GetDepth');
-		return this.rest.getOrderBook(this.symbol).then(data=>{
+		return this.rest.getOrderBook(this.symbol).then(data => {
 			debug('GetDepth', data);
-			if (!data || !data.bids || !data.asks) throw new Error(this.GetName()+' depth error '+JSON.stringify(data));
+			if (!data || !data.bids || !data.asks) throw new Error(this.GetName() + ' depth error ' + JSON.stringify(data));
 
-			let asks = data.asks.map(r=>{
+			let asks = data.asks.map(r => {
 				return {
 					Price: N.parse(r.price),
 					Amount: N.parse(r.volume)
-				}
+				};
 			});
 
-			let bids = data.bids.map(r=>{
+			let bids = data.bids.map(r => {
 				return {
 					Price: N.parse(r.price),
 					Amount: N.parse(r.volume)
-				}
+				};
 			});
 
 			return Promise.resolve({
@@ -275,7 +275,7 @@ class EXCHANGE {
 		}
 		 */
 		debug('GetAccount');
-		return this.rest.getMyBalance().then(data=>{
+		return this.rest.getMyBalance().then(data => {
 			debug('GetAccount', data);
 			if (data && data.balance) {
 				let re = {
@@ -286,7 +286,7 @@ class EXCHANGE {
 				};
 				return re;
 			} else {
-				throw new Error(this.GetName() + 'GetAccount return error: '+JSON.stringify(data));
+				throw new Error(this.GetName() + 'GetAccount return error: ' + JSON.stringify(data));
 			}
 		});
 	}
@@ -320,13 +320,13 @@ class EXCHANGE {
 
 		return this.rest.getMyActiveOrders(params).then(data => {
 			debug('GetOrders', data);
-			if (!data || !data.orders) throw new Error(this.GetName() + ' GetOrders() returns bad data '+JSON.stringify(data));
-			return data.orders.map(o=> {
+			if (!data || !data.orders) throw new Error(this.GetName() + ' GetOrders() returns bad data ' + JSON.stringify(data));
+			return data.orders.map(o => {
 				return {
 					Id: o.clientOrderId,
 					Price: N.parse(o.orderPrice),
-					Amount: N(o.orderQuantity).div(100)*1,
-					DealAmount: N(o.execQuantity).div(100)*1,
+					Amount: N(o.orderQuantity).div(100) * 1,
+					DealAmount: N(o.execQuantity).div(100) * 1,
 					Type: o.side === 'buy' ? 'Buy' : 'Sell',
 					Time: N.parse(o.lastTimestamp),
 					Status: this._order_status(o.orderStatus)
@@ -338,9 +338,9 @@ class EXCHANGE {
 
 	GetOrder(orderId) {
 		debug('GetOrder', orderId);
-		return this.GetOrders(orderId).then(orders=>{
+		return this.GetOrders(orderId).then(orders => {
 			debug('GetOrder, first get all orders', orders);
-			for(let i=0;i<orders.length;i++) {
+			for (let i = 0;i < orders.length;i++) {
 				if (orders[i].Id == orderId) return orders[i];
 			}
 			return null;
@@ -356,14 +356,14 @@ class EXCHANGE {
 		rejected 
 		expired
 		 */
-		switch(status) {
-			case 'new': 
-			case 'partiallyFilled': return 'Pending';
-			case 'filled': return 'Closed';
-			case 'canceled': return 'Cancelled';
-			case 'rejected': return 'Cancelled';
-			case 'expired': return 'Cancelled';
-			default: return status;
+		switch (status) {
+				case 'new': 
+				case 'partiallyFilled': return 'Pending';
+				case 'filled': return 'Closed';
+				case 'canceled': return 'Cancelled';
+				case 'rejected': return 'Cancelled';
+				case 'expired': return 'Cancelled';
+				default: return status;
 		}
 	}
 
@@ -389,11 +389,11 @@ class EXCHANGE {
 		 */
 		
 		let params = {
-			clientOrderId: 'bot'+Date.now()+ Math.floor(1000, Math.random()*9000),
+			clientOrderId: 'bot' + Date.now() + Math.floor(1000, Math.random() * 9000),
 			symbol: this.symbol,
 			side,
-			price: N(price).floor(2)*1,
-			quantity: N(amount).multiply(100).floor(0)*1,
+			price: N(price).floor(2) * 1,
+			quantity: N(amount).multiply(100).floor(0) * 1,
 			type: 'limit',
 			timeInForce: 'GTC'
 		};
@@ -404,11 +404,11 @@ class EXCHANGE {
 			params.timeInForce = 'IOC';
 		}
 		debug('_trade', params);
-		return this.rest.placeOrder(params).then(data=>{
+		return this.rest.placeOrder(params).then(data => {
 			debug('_trade result', data);
 			let result = data.ExecutionReport;
 			if (data && result) return result.clientOrderId;
-			throw new Error(this.GetName()+' new order failed: '+JSON.stringify(data));
+			throw new Error(this.GetName() + ' new order failed: ' + JSON.stringify(data));
 		});
 	}
 
@@ -455,25 +455,25 @@ class EXCHANGE {
 		debug('CancelOrder', orderId);
 		return this.rest.cancelOrder({
 			clientOrderId: orderId
-		}).then(result=>{
+		}).then(result => {
 			debug('CancelOrder result', result);
 			return !!(result && result.ExecutionReport && result.ExecutionReport.orderStatus == 'canceled');
 		});
 	}
 
 	CancelPendingOrders() {
-		console.log(this.GetName()+' cancelling pending orders...');
+		console.log(this.GetName() + ' cancelling pending orders...');
 		debug('CancelPendingOrders');
 		return this.rest.cancelAllOrders({
 			symbols: this.symbol
 		}).then( data => {
 			debug('CancelPendingOrders', data);
 			if (data && data.ExecutionReport) {
-				return data.ExecutionReport.map(o=>{
+				return data.ExecutionReport.map(o => {
 					return o.orderStatus == 'canceled';
 				});
 			} else {
-				throw new Error(this.GetName() + ' CancelPendingOrders error: '+ JSON.stringify(data));
+				throw new Error(this.GetName() + ' CancelPendingOrders error: ' + JSON.stringify(data));
 			}
 		});
 	}
