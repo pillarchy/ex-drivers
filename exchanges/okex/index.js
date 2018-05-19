@@ -131,8 +131,15 @@ class OKEX extends EXCHANGE {
 				});
 			}
 
-			re.Info = data.info;
-			return re;
+			let arr = [];
+			Object.keys(re).map(coin => {
+				arr.push({
+					Currency: coin,
+					...re[coin]
+				});
+			});
+
+			return arr;
 		});
 	}
 
