@@ -15,18 +15,18 @@ describe('test accounts related', function() {
 		console.log(await okex.GetTicker());
 	});
 
-	it('should get account', async () => {
-		let a = await okex.GetAccount();
-		console.log(a);
-	});
+	// it('should get account', async () => {
+	// 	let a = await okex.GetAccount();
+	// 	console.log(a);
+	// });
 
-	it('should get accounts', async () => {
-		let a = await okex.GetAccounts();
-		console.log(a);
-	});
+	// it('should get accounts', async () => {
+	// 	let a = await okex.GetAccounts();
+	// 	console.log(a);
+	// });
 
-	it('should get trades', async () => {
-		console.log(await okex.GetTrades());
-	});
+	// it('should get trades', async () => {
+	// 	console.log(await okex.GetTrades());
+	// });
 
 });

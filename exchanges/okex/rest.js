@@ -42,15 +42,14 @@ class OKCoin {
 		let options = {
 			method: httpMethod,
 			timeout: httpMethod === 'GET' ? 2000 : 5000,
-			headers: {
-				'Content-Type':'application/x-www-form-urlencoded',
-				'Content-Length': body.length
-			},
+			headers: {},
 			forever: true
 		};
+		
 		if (httpMethod === 'POST') {
 			options.body = body;
 			options.headers['Content-Length'] = body.length;
+			options.headers['Content-Type'] = 'application/x-www-form-urlencoded';
 		}
 
 		url = 'https://www.okex.com/api/v1/' + url;
