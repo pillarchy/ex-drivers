@@ -1,5 +1,4 @@
-const crypto = require('crypto');
-const md5 = s => crypto.createHash('md5').update(s).digest('hex');
+const { md5 }  = require('utility');
 const fetch = require('node-fetch');
 const N = require('precise-number');
 const R = require('ramda');

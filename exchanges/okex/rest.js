@@ -1,9 +1,13 @@
-const md5 = s => crypto.createHash('md5').update(s).digest('hex');
-const fetch = require('node-fetch');
+const { md5 }  = require('utility');
+const fetch = require('../../lib/fetch');
 const N = require('precise-number');
 const R = require('ramda');
 const debug = require('debug')('exchange:okex:rest');
-const wait = require('delay');
+const RateLimit = require('../../lib/rate-limit');
+const ExError = require('../../lib/error');
+const ErrorCode = require('../../lib/error-code');
+
+
 
 class OKCoin {
 
@@ -11,12 +15,16 @@ class OKCoin {
 		this.debug = true;
 		this.key = options.Key;
 		this.secret = options.Secret;
-		this.coin_type = options.Currency.toLowerCase() + '_' + options.BaseCurrency.toLowerCase();
+		this.symbol = options.Currency.toLowerCase() + '_' + options.BaseCurrency.toLowerCase();
 		this.options = options;
+
+		this.getAccountRateLimiter = new RateLimit(2000, 6);
+		this.tradeRateLimiter = new RateLimit(2000, 20);
+		this.cancelRateLimiter = new RateLimit(2000, 20);
+		this.orderInfoRateLimiter = new RateLimit(2000, 20);
 	}
 
 	async fetch(url, params, method) {
-		await this.options.rateLimiter.wait();
 		if (!params) params = {};
 		params.api_key = this.key;
 		params.sign = sign(params, this.secret);
@@ -30,34 +38,23 @@ class OKCoin {
 		debug('<<', method, url, 'BODY:', body);
 
 		let httpMethod = method ? method : 'POST';
-
-		return fetch('https://www.okex.com/api/v1/' + url, {
+		
+		let options = {
 			method: httpMethod,
 			timeout: httpMethod === 'GET' ? 2000 : 5000,
-			body,
 			headers: {
 				'Content-Type':'application/x-www-form-urlencoded',
 				'Content-Length': body.length
-			}
-		}).then(async res => {
-			return [res, await res.text()];
-		}).then(([res, t]) => {
-			debug('>> ' + t);
+			},
+			forever: true
+		};
+		if (httpMethod === 'POST') {
+			options.body = body;
+			options.headers['Content-Length'] = body.length;
+		}
 
-			if (!t) {
-				if (res.status >= 400) {
-					return Promise.reject('OKEX rest status error: ' + res.status + ' ' + res.statusText);
-				}
-				console.log(res);
-				return Promise.reject('OKEX returns empty: ' + url);
-			}
-			try {
-				let d = JSON.parse(t);
-				return Promise.resolve(d);
-			} catch ( err ) {
-				return Promise.reject('OKEX JSON parse error: ' + t);
-			}
-		}).then(json => {
+		url = 'https://www.okex.com/api/v1/' + url;
+		return fetch(url, options).then(r => r.json()).then(json => {
 			if (json && json.error_code) {
 				json.error_message = errorMessage(json.error_code);
 				let err = new Error(JSON.stringify(json));
@@ -68,37 +65,54 @@ class OKCoin {
 			} else {
 				return Promise.resolve(json);
 			}
+		}).catch(err => {
+			if (err && err.name === 'RequestError' && err.message && /ESOCKETTIMEDOUT/.test(err.message) ) {
+				throw new ExError(ErrorCode.REQUEST_TIMEOUT, url + ' timeout');
+			}
+			throw err;
 		});
 	}
 
-	GetTicker() {
-		return this.fetch('ticker.do?symbol=' + this.coin_type, null, 'GET').then(data => {
-			return Promise.resolve({
-				High: N.parse(data.ticker.high),
-				Low: N.parse(data.ticker.low),
-				Buy: N.parse(data.ticker.buy),
-				Sell: N.parse(data.ticker.sell),
-				Last: N.parse(data.ticker.last),
-				Volume: N.parse(data.ticker.vol),
-				Time: N.parse(data.date) * 1000
-			});
-		});
+	async GetTicker() {
+		let data = await this.fetch('ticker.do?symbol=' + this.symbol, null, 'GET');
+		return {
+			High: N.parse(data.ticker.high),
+			Low: N.parse(data.ticker.low),
+			Buy: N.parse(data.ticker.buy),
+			Sell: N.parse(data.ticker.sell),
+			Last: N.parse(data.ticker.last),
+			Volume: N.parse(data.ticker.vol),
+			Time: N.parse(data.date) * 1000
+		};
 	}
 
-	GetAccount() {
+	async GetAccount() {
+		await this.getAccountRateLimiter.wait();
 		return this.fetch('userinfo.do');
 	}
 
-	GetOrder(orderId) {
+	async GetOrder(orderId) {
+		await this.orderInfoRateLimiter.wait();
 		return this.fetch('order_info.do', {
-			symbol: this.coin_type,
+			symbol: this.symbol,
 			order_id: orderId
 		});
 	}
 
-	CancelOrder(orderId) {
+	//get order history
+	GetTrades(page) {
+		return this.fetch('order_history.do', {
+			symbol: this.symbol,
+			status: 1,
+			current_page: page,
+			page_length: 200
+		});
+	}
+
+	async CancelOrder(orderId) {
+		await this.cancelRateLimiter.wait();
 		return this.fetch('cancel_order.do', {
-			symbol: this.coin_type,
+			symbol: this.symbol,
 			order_id: orderId
 		}).catch(err => {
 			if (err && err.error_code) return err;
@@ -107,18 +121,21 @@ class OKCoin {
 	}
 
 	async Trade(type, price, amount) {
+		if (await this.tradeRateLimiter.wait() > 100) {
+			throw new ExError(ErrorCode.REQUEST_TOO_FAST, 'okex trade too fast');
+		}
 		let startTime = Date.now();
 		let params = {
-			symbol: this.coin_type,
+			symbol: this.symbol,
 			type,
 			price,
 			amount
 		};
-		if (type == 'buy_market') {
+		if (type === 'buy_market') {
 			params.price = params.amount;
 			delete(params.amount);
 		}
-		if (type == 'sell_market') {
+		if (type === 'sell_market') {
 			delete(params.price);
 		}
 		let re = await this.fetch('trade.do', params);
@@ -138,52 +155,15 @@ class OKCoin {
 		return this.Trade(action, price, amount);
 	}
 
-
-
-	buy(price, amount) {
-		return this.fetch({
-			method: 'buy',
-			coin_type: this.coin_type,
-			price,
-			amount
-		});
-	}
-
-	sell(price, amount) {
-		return this.fetch({
-			method: 'sell',
-			coin_type: this.coin_type,
-			price,
-			amount
-		});
-	}
-
-	buyMarket(amount) {
-		return this.fetch({
-			method: 'buy_market',
-			coin_type: this.coin_type,
-			amount
-		});
-	}
-
-
-	sellMarket(amount) {
-		return this.fetch({
-			method: 'sell_market',
-			coin_type: this.coin_type,
-			amount
-		});
-	}
-
 	GetDepth(size, merge) {
-		let params = ['symbol=' + this.coin_type];
+		let params = ['symbol=' + this.symbol];
 		if (!size) size = 50;
 		if (size) params.push('size=' + size);
 		if (merge) params.push('merge=' + merge);
 
 		return this.fetch('depth.do?' + params.join('&'), null, 'GET').then(data => {
 
-			if (!data || !data.bids || !data.asks) throw new Error('get okcoin ' + this.coin_type + ' depth error ' + JSON.stringify(data));
+			if (!data || !data.bids || !data.asks) throw new Error('get okcoin ' + this.symbol + ' depth error ' + JSON.stringify(data));
 
 			let asks = [];
 			let bids = [];

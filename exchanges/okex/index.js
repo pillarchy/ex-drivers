@@ -5,6 +5,7 @@ const { ok } = require('assert');
 const DelayTrigger = require('../../lib/delay-trigger.js');
 const EXCHANGE = require('../exchange.js');
 
+
 class OKEX extends EXCHANGE {
 	constructor(options) {
 		options = Object.assign({
@@ -101,8 +102,37 @@ class OKEX extends EXCHANGE {
 				Balance: N.parse(data.info.funds.free[base]),
 				FrozenBalance: N.parse(data.info.funds.freezed[base]),
 				Stocks: N.parse(data.info.funds.free[currency]),
-				FrozenStocks: N.parse(data.info.funds.freezed[currency])
+				FrozenStocks: N.parse(data.info.funds.freezed[currency]),
+				Info: data.info
 			};
+		});
+	}
+
+	GetAccounts() {
+		return this.rest.GetAccount().then( data => {
+			if (!data || !data.info || !data.info.funds) throw new Error('okex get account error:' + JSON.stringify(data));
+			let re = {};
+			let funds = data.info.funds;
+			if (funds.free) {
+				Object.keys(funds.free).map(c => {
+					let coin = c ? c.toUpperCase() : '';
+					if (!coin) return;
+					if (!re[coin]) re[coin] = { Free: 0, Frozen: 0 };
+					re[coin].Free = N.parse(funds.free[c]);
+				});
+			}
+
+			if (funds.freezed) {
+				Object.keys(funds.freezed).map(c => {
+					let coin = c ? c.toUpperCase() : '';
+					if (!coin) return;
+					if (!re[coin]) re[coin] = { Free: 0, Frozen: 0 };
+					re[coin].Frozen = N.parse(funds.freezed[c]);
+				});
+			}
+
+			re.Info = data.info;
+			return re;
 		});
 	}
 
@@ -135,6 +165,30 @@ class OKEX extends EXCHANGE {
 			}
 			return Promise.resolve(orders);
 		});
+	}
+
+	/**
+	 * get finished order history
+	 */
+	async GetTrades(page = 1) {
+		let data = await this.rest.GetTrades(page);
+		let trades = [];
+		if (data && data.orders) {
+			data.orders.map(o => {
+				trades.push({
+					Id: o.order_id,
+					Time: N.parse(o.create_date),
+					Price: N.parse(o.price),
+					Amount: N.parse(o.amount),
+					DealAmount: N.parse(o.deal_amount),
+					Status: this._order_status(o.status),
+					Type: this._order_type(o.type),
+					AvgPrice: N.parse(o.avg_price),
+					Info: o
+				});
+			});
+		}
+		return trades.filter(o => o.Status === 'Closed');
 	}
 
 	Buy(price, amount) {

@@ -1,5 +1,4 @@
-const crypto = require('crypto');
-const md5 = s => crypto.createHash('md5').update(s).digest('hex');
+const { md5 }  = require('utility');
 const WS = require('../../lib/auto-reconnect-ws.js');
 const debug = require('debug')('okex:ws2');
 const clor = require('clor');
