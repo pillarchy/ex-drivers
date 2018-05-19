@@ -195,7 +195,7 @@ class OKEX extends EXCHANGE {
 				});
 			});
 		}
-		return trades.filter(o => o.Status === 'Closed');
+		return trades.filter(o => o.DealAmount > 0);
 	}
 
 	Buy(price, amount) {
