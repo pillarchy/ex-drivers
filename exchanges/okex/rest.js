@@ -71,7 +71,7 @@ class OKCoin {
 			}
 
 			if (err && err.name === 'StatusCodeError' && err.statusCode === 429) {
-				throw new ExError(ErrorCode.REQUEST_TIMEOUT, url + ' returns 429');
+				throw new ExError(ErrorCode.REQUEST_TOO_FAST, url + ' too many requests');
 			}
 
 			throw err;
