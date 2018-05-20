@@ -25,6 +25,7 @@ class OKCoin {
 	}
 
 	async fetch(url, params, method) {
+		await this.options.rateLimiter.wait();
 		if (!params) params = {};
 		params.api_key = this.key;
 		params.sign = sign(params, this.secret);
@@ -45,7 +46,7 @@ class OKCoin {
 			headers: {},
 			forever: true
 		};
-		
+
 		if (httpMethod === 'POST') {
 			options.body = body;
 			options.headers['Content-Length'] = body.length;
@@ -68,6 +69,11 @@ class OKCoin {
 			if (err && err.name === 'RequestError' && err.message && /ESOCKETTIMEDOUT/.test(err.message) ) {
 				throw new ExError(ErrorCode.REQUEST_TIMEOUT, url + ' timeout');
 			}
+
+			if (err && err.name === 'StatusCodeError' && err.statusCode === 429) {
+				throw new ExError(ErrorCode.REQUEST_TIMEOUT, url + ' returns 429');
+			}
+
 			throw err;
 		});
 	}
