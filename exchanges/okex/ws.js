@@ -48,9 +48,9 @@ class EXCHANGE {
 			};
 		}
 
-		if (options.onPublicTrade) {
+		if (options.onPublicTrades) {
 			handlers[`ok_sub_spot_${this.symbol}_deals`] = (data, err) => {
-				this.onPublicTrade(data, err);
+				this.onPublicTrades(data, err);
 			};
 		}
 
@@ -59,9 +59,18 @@ class EXCHANGE {
 		this.cb = options.onUpadte ? options.onUpadte : function() { };
 	}
 
-	onPublicTrade(data) {
-		if (this.options.onPublicTrade) {
-			this.options.onPublicTrade(data);
+	onPublicTrades(data) {
+		if (this.options.onPublicTrades) {
+			data = data.map(t => {
+				return {
+					Id: t[0],
+					Price: N.parse(t[1]),
+					Amount: N.parse(t[2]),
+					Time: Date.now(),
+					Type: t[4] === 'ask' ? 'Buy' : 'Sell'
+				};
+			});
+			this.options.onPublicTrades(data);
 		}	
 	}
 

@@ -8,5 +8,7 @@ module.exports = {
 	BITTREX: require('./exchanges/bittrex/index.js'),
 
 	RateLimiter: require('./lib/rate-limit.js'),
-	AutoKiller: require('./lib/auto-kill.js')
+	AutoKiller: require('./lib/auto-kill.js'),
+
+	ErrorCode: require('./lib/error-code.js')
 };
