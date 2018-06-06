@@ -32,10 +32,19 @@ class EXCHANGE {
 		this.ws.on('open', () => {
 
 			if (this.options.onDepth) {
-				this.ws.send(JSON.stringify({
-					event: 'addChannel',
-					channel: this.symbol + '_depth'
-				}));
+				if( this.options.MultipleDepth ){  //MultipleDepth:['zbqc','zbusdt','zbbtc'],
+					for(let symbol of this.options.MultipleDepth){
+						this.ws.send(JSON.stringify({
+							event: 'addChannel',
+							channel: symbol.toLowerCase() + '_depth'
+						}));
+					}
+				}else{
+					this.ws.send(JSON.stringify({
+						event: 'addChannel',
+						channel: this.symbol + '_depth'
+					}));
+				}
 			}
 
 			if (this.options.onTicker) {
@@ -117,7 +126,11 @@ class EXCHANGE {
 			Bids: R.sort( R.descend( R.prop('Price') ), bids)
 		};
 
-		this.options.onDepth(depth);
+		if( this.options.MultipleDepth ){
+			this.options.onDepth(depth, data.channel.replace('_depth','') ,data.timestamp);
+		}else{
+			this.options.onDepth(depth);	
+		}
 	}
 
 	onTicker(data) {
