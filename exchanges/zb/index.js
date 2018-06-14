@@ -36,9 +36,14 @@ class ZB extends EXCHANGE {
 		return this.options.isWS ? this.ws : this.rest;
 	}
 
-	GetAccount(interestedCoins, withInfo) {
+	async SendWSCommand(cmd) {
+		await this.waitUntilWSReady();
+		await this.ws.ws.send(cmd);
+	}
+
+	GetAccount() {
 		return this.getHandler().GetAccount().then(data => {
-			if (!data.coins) throw new Error("zb.com GetAccount result error: " + JSON.stringify(data));
+			if (!data.coins) throw new Error("zb GetAccount result error: " + JSON.stringify(data));
 			let re = {
 				Balance: 0,
 				FrozenBalance: 0,
@@ -57,11 +62,6 @@ class ZB extends EXCHANGE {
 					re.FrozenZB = N.parse(a.freez);
 				}
 
-				if (interestedCoins && interestedCoins.indexOf(a.key.toUpperCase()) !== -1) {
-					re[a.key.toUpperCase()] = N.parse(a.available);
-					re['Frozen' + a.key.toUpperCase()] = N.parse(a.freez);
-				}
-
 				if (a.key === 'usdt') {
 					re.USDT = N.parse(a.available);
 					re.FrozenUSDT = N.parse(a.freez);
@@ -72,7 +72,23 @@ class ZB extends EXCHANGE {
 					re.FrozenQC = N.parse(a.freez);
 				}
 			});
-			if (withInfo) re.Info = data;
+			re.Info = data;
+			return re;
+		});
+	}
+
+	GetAccounts() {
+		return this.getHandler().GetAccount().then(data => {
+			if (!data.coins) throw new Error("zb GetAccount result error: " + JSON.stringify(data));
+			let re = [];
+			data.coins.map(a => {
+				re.push({
+					Currency: String(a.key).toUpperCase(),
+					Free: N.parse(a.available),
+					Frozen: N.parse(a.freez),
+					Info: a
+				});
+			});
 			return re;
 		});
 	}

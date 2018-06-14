@@ -11,9 +11,12 @@ class EXCHANGE {
 		this.options = options;
 		this.symbol = options.Currency.toLowerCase() + '_' + options.BaseCurrency.toLowerCase();
 		this.options.Symbol = this.symbol;
+		let originalOnConnect = this.options.onConnect;
 		this.options.onConnect = () => {
 			debug('onConnect');
 			this.wsReady = true;
+
+			if (originalOnConnect && typeof originalOnConnect === 'function') originalOnConnect();
 		};
 
 		this.ws = new OKWS(this.options);
@@ -50,7 +53,7 @@ class EXCHANGE {
 
 		if (options.onPublicTrades) {
 			handlers[`ok_sub_spot_${this.symbol}_deals`] = (data, err) => {
-				this.onPublicTrades(data, err);
+				if (!err) this.onPublicTrades(data, this.symbol);
 			};
 		}
 
@@ -59,7 +62,7 @@ class EXCHANGE {
 		this.cb = options.onUpadte ? options.onUpadte : function() { };
 	}
 
-	onPublicTrades(data) {
+	onPublicTrades(data, symbol) {
 		if (this.options.onPublicTrades) {
 			data = data.map(t => {
 				return {
@@ -67,6 +70,7 @@ class EXCHANGE {
 					Price: N.parse(t[1]),
 					Amount: N.parse(t[2]),
 					Time: Date.now(),
+					Symbol: String(symbol).toUpperCase(),
 					Type: t[4] === 'ask' ? 'Buy' : 'Sell'
 				};
 			});
