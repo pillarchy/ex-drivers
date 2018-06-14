@@ -5,7 +5,7 @@ let zb = new ExDrivers.ZB({
 	Key: accounts.zb.key,
 	Secret: accounts.zb.secret,
 	Currency: 'BTC',
-	BaseCurrency: 'USDT'
+	BaseCurrency: 'QC'
 });
 
 describe('test accounts related', function() {
@@ -25,8 +25,8 @@ describe('test accounts related', function() {
 		console.log(a);
 	});
 
-	// it('should get trades', async () => {
-	// 	console.log(await zb.GetTrades());
-	// });
+	it('should get trades', async () => {
+		console.log(await zb.GetTrades());
+	});
 
 });

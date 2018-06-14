@@ -162,6 +162,15 @@ class ZB extends EXCHANGE {
 		});	
 	}
 
+	async GetTrades(page = 1) {
+		let trades = await this.rest.GetTrades(page);
+		trades = trades.map( t => {
+			t.AvgPrice = t.Price;
+			return t;
+		});
+		return trades.filter(o => o.DealAmount > 0);
+	}
+
 	GetOrder(orderId) {
 		return this.getHandler().GetOrder(orderId).then(o => {
 			return o;

@@ -8,7 +8,7 @@ APIs:
 =====
 
 
-`GetAccount()`
+`GetAccount()`  get account information
 
 ```
 {
@@ -20,7 +20,7 @@ APIs:
 }
 ```
 
-`GetAccounts()`
+`GetAccounts()`  get account information of all coins
 
 ```
 [
@@ -33,7 +33,7 @@ APIs:
 ]
 ```
 
-`GetTicker()`
+`GetTicker()`  get ticker data
 
 ```
 {
@@ -46,3 +46,20 @@ APIs:
 }
 ```
 
+
+`GetTrades(page = 1)` get trade history
+
+```
+[
+	{
+		Id: string,
+		Price: float,
+		Amount: float,
+		DealAmount: float,
+		AvgPrice: float,
+		Status: Pendding || Cancelled || Closed,
+		Info: {...original object from exchange api}
+	},
+	...
+]
+```
