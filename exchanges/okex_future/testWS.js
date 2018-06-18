@@ -19,25 +19,25 @@ const Exchange = new OKCoin({
 	isWS: true,
 	DefaultContactType: 'quarter',
 	MarginLevel: 10,
-	onDepth(depth) {
-		console.log('on depth', depth.Asks.pop().Price, depth.Bids[0].Price);
-	},
-	onPositionChange(data) {
-		console.log('on position change', data);
-	},
-	onTrade(data) {
-		console.log('on trade', data);
-	},
+	// onDepth(depth) {
+	// 	console.log('on depth', depth.Asks.pop().Price, depth.Bids[0].Price);
+	// },
+	// onPositionChange(data) {
+	// 	console.log('on position change', data);
+	// },
+	// onTrade(data) {
+	// 	console.log('on trade', data);
+	// },
 	onIndex(data) {
 		console.log('on index', data);
 	},
-	onAccountChange(data) {
-		console.log('on account change', data);
-	},
+	// onAccountChange(data) {
+	// 	console.log('on account change', data);
+	// },
 
-	onTicker(data) {
-		console.log('on ticker', data);
-	}
+	// onTicker(data) {
+	// 	console.log('on ticker', data);
+	// }
 });
 
 const log = console.log.bind(console);

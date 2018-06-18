@@ -1,13 +1,13 @@
 const config = require('../../accounts.config.json');
 const EX = require('./index.js');
-const wait = require('pwait');
+const wait = require('delay');
 
 let ex = new EX({
 	Key: config.bitflyer.key,
 	Secret: config.bitflyer.secret,
 	Currency: 'BTC',
 	Rate: 1,
-	isWS: false,
+	isWS: true,
 	onDepth: (depth) => {
 		console.log(depth);
 	}

@@ -36,17 +36,20 @@ class REST {
 
 		let httpMethod = method ? method : 'POST';
 
-		return fetch('https://api.bitflyer.jp' + url, {
+		let options = {
 			method: httpMethod,
 			timeout: httpMethod === 'GET' ? 5000 : 10000,
-			body,
 			headers: {
 				'ACCESS-KEY': this.key,
 				'ACCESS-TIMESTAMP': timestamp,
 				'ACCESS-SIGN': sign,
 				'Content-Type': 'application/json'
 			}
-		}).then(res => res.text()).then(t => {
+		};
+
+		if (body) options.body = body;
+
+		return fetch('https://api.bitflyer.jp' + url, options).then(res => res.text()).then(t => {
 			debug('>> ' + t);
 
 			if (!t) return Promise.reject('Bitflyer returns empty: ' + url);
