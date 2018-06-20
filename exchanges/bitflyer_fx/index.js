@@ -20,7 +20,7 @@ class EX extends EXCHANGE {
 				Taker: 0
 			},
 			RateLimit: 10,
-			Decimals: 8,
+			Decimals: 0,
 			StockDecimals: 3,
 			MinTradeStocks: 0.01,
 			BaseCurrency: 'JPY',
