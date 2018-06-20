@@ -100,7 +100,10 @@ class REST {
 			product_code: this.symbol,
 			child_order_state: 'ACTIVE'
 		};
-		if (orderId) params.child_order_acceptance_id = orderId;
+		if (orderId) {
+			params.child_order_acceptance_id = orderId;
+			delete params.child_order_state;
+		}
 		return this.fetch('/v1/me/getchildorders', params, 'GET');
 	}
 

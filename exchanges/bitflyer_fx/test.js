@@ -23,6 +23,10 @@ describe('test Bitflyer', function() {
 	// it('should get ticker', () => ex.GetTicker().then(log));
 
 	// it('should get depth', () => ex.GetDepth().then(log));
+	// 
+	
+
+	it('should get order', () => ex.GetOrder('JRF20180620-181440-004938').then(log));
 
 	it('should get account', () => ex.GetAccount().then(log));
 
@@ -30,29 +34,29 @@ describe('test Bitflyer', function() {
 
 	// it('should get collateral', () => ex.GetCollateral().then(log));
 
-	it('should get orders', async () => {
-		let orders = await ex.GetOrders();
-		console.log(orders);
-		if (orders.length > 0) {
-			console.log(await ex.GetOrder(orders[0].Id));
-		}
-	});
+	// it('should get orders', async () => {
+	// 	let orders = await ex.GetOrders();
+	// 	console.log(orders);
+	// 	if (orders.length > 0) {
+	// 		console.log(await ex.GetOrder(orders[0].Id));
+	// 	}
+	// });
 
-	it('should short', async () => {
-		try {
-			let orderId = await ex.Short(770712, 0.01);
-			console.log('short result', orderId);
+	// it('should short', async () => {
+	// 	try {
+	// 		let orderId = await ex.Short(770712, 0.01);
+	// 		console.log('short result', orderId);
 
-			await wait(1000);
-			console.log(await ex.GetOrder(orderId));
-		} catch (err) {
-			console.log(err.code, err.message);
-		}
+	// 		await wait(1000);
+	// 		console.log(await ex.GetOrder(orderId));
+	// 	} catch (err) {
+	// 		console.log(err.code, err.message);
+	// 	}
 
-		// console.log(await ex.CancelOrder(orderId));
-	});
+	// 	// console.log(await ex.CancelOrder(orderId));
+	// });
 
-	it('should get account', () => ex.GetAccount().then(log));
+	// it('should get account', () => ex.GetAccount().then(log));
 	
 	// it('should cancel pending orders', async () => {
 	// 	console.log(await ex.CancelPendingOrders());

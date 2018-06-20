@@ -347,7 +347,7 @@ class EX extends EXCHANGE {
 			FrozenBalance: usedBalance,
 			Stocks: 0,
 			FrozenStocks: 0,
-			MarginLevel: N(1).div(info.keep_rate).multiply(this.options.MarginLevel) * 1,
+			MarginLevel: info.keep_rate > 0 ? (N(1).div(info.keep_rate).multiply(this.options.MarginLevel) * 1) : 0,
 			Info: info
 		};
 
