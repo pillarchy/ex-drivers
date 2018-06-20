@@ -1,6 +1,6 @@
 {
   "name": "ex-drivers",
-  "version": "0.0.12",
+  "version": "0.0.13",
   "description": "crypto currency exchange drivers",
   "main": "index.js",
   "dependencies": {
