@@ -4,17 +4,29 @@ const N = require('precise-number');
 const { ok } = require('assert');
 const wait = require('delay');
 const fetch = require('node-fetch');
+const EXCHANGE = require('../exchange.js');
 
-class EXCHANGE {
+class EX extends EXCHANGE {
 	constructor(options) {
-		if (!options.Currency) throw new Error('no Currency');
-		if (options.BaseCurrency) options.BaseCurrency = 'USD';
-		if (!options.DefaultContactType) throw new Error('no DefaultContactType');
+		options = Object.assign({
+			Name: 'OKEX_FUTURE',
+			Fees: {
+				Maker: 0.0003,
+				Taker: 0.0005
+			},
+			RateLimit: 10,
+			Decimals: 8,
+			StockDecimals: 3,
+			MinTradeStocks: 1,
+			BaseCurrency: 'USD',
+			DefaultContactType: 'quarter',
+			Currency: 'BTC',
+			ContractMode: 'Seperate',
+			MarginLevel: 10
+		}, options);
+		super(options);
 
-		if (!options.ContractMode) options.ContractMode = 'Seperate';
 		if (['All', 'Seperate'].indexOf(options.ContractMode) === -1) throw new Error('options.ContractMode should either be All or Seperate');
-
-		if (!options.MarginLevel) throw new Error('no MarginLevel');
 		if (options.MarginLevel !== 10 && options.MarginLevel !== 20) throw new Error('wrong MarginLevel');
 
 		this._check_contract_type(options.DefaultContactType);
@@ -22,11 +34,6 @@ class EXCHANGE {
 		this.options = options;
 		if (options.isWS) this.ws = new EXCHANGE_WS(options);
 		this.rest = new EXCHANGE_REST(options);
-
-		this.fee = {
-			Maker: 0.03,
-			Taker: 0.05
-		};
 	}
 
 	_check_contract_type(contract_type) {
@@ -84,33 +91,14 @@ class EXCHANGE {
 		return true;
 	}
 
-
 	API(url, params, method) {
 		if (!method) method = 'POST';
 		return this.rest.fetch(url, params, method);
 	}
 
-	SetFee(fee) {
-		ok(fee, 'no fee');
-		ok(fee.Maker);
-		ok(fee.Taker);
-		this.fee = fee;
-	}
-
 	//设置杠杆倍率
 	SetMarginLevel(level) {
 		this.options.MarginLevel = level;
-	}
-
-	GetFee(type) {
-		if (type) return this.fee[type];
-		return this.fee;
-	}
-
-	GetName(contract_type) {
-		let name = this.options.Name ? this.options.Name : 'OKEX';
-		if (!contract_type) contract_type = this.options.DefaultContactType;
-		return `${name}_${contract_type}`;
 	}
 
 	getHandler() {
@@ -269,11 +257,6 @@ class EXCHANGE {
 		};
 	}
 
-	GetMin() {
-		if (this.options.MinTradeStocks) return this.options.MinTradeStocks;
-		return 0.01;
-	}
-
 	Trade(direction, price, amount, contract_type) {
 		if (!contract_type) contract_type = this.options.DefaultContactType;
 		this._check_contract_type(contract_type);
@@ -407,4 +390,4 @@ class EXCHANGE {
 }
 
 
-module.exports = EXCHANGE;
+module.exports = EX;

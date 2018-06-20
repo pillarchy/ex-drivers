@@ -237,12 +237,13 @@ class EXCHANGE {
 			}
 
 			data = {
-				Asks: R.sort( R.descend( R.prop('Price') ), asks),
+				Asks: R.sort( R.ascend( R.prop('Price') ), asks),
 				Bids: R.sort( R.descend( R.prop('Price') ), bids)
 			};
 		} else {
 			err = true;
 		}
+		
 		if (typeof this.options.onDepth === 'function') {
 			if (!err) {
 				this.options.onDepth(data);

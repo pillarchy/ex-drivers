@@ -5,6 +5,8 @@ const debug = require('debug')('exchange:bitflyer:rest');
 const wait = require('delay');
 const crypto = require('crypto');
 const urlencode = require('urlencode-for-php');
+const ExError = require('../../lib/error');
+const ErrorCode = require('../../lib/error-code');
 
 class REST {
 
@@ -16,7 +18,7 @@ class REST {
 		this.symbol = 'FX_' + options.Currency + '_' + options.BaseCurrency;
 	}
 
-	fetch(url, params, method) {
+	fetch(url, params, method, allowEmptyResponse = false) {
 		if (!method) throw new Error('need method');
 
 		let body = '';
@@ -48,10 +50,20 @@ class REST {
 		};
 
 		if (body) options.body = body;
+		return fetch('https://api.bitflyer.jp' + url, options).then(async res => {
+			let status = res.status;
+			if (status === 404) throw new ExError(ErrorCode.URL_NOT_FOUND, `resource ${url} not found (404)`);
+			if (status === 429) throw new ExError(ErrorCode.REQUEST_TOO_FAST, `request too fast (${url})`);
 
-		return fetch('https://api.bitflyer.jp' + url, options).then(res => res.text()).then(t => {
-			debug('>> ' + t);
+			return {
+				t: await res.text(),
+				status
+			};
+		}).then(info => {
+			let { t, status } = info;
+			debug('>> ' + status + ':' + t);
 
+			if (allowEmptyResponse && status === 200) return true;
 			if (!t) return Promise.reject('Bitflyer returns empty: ' + url);
 			try {
 				let d = JSON.parse(t);
@@ -76,86 +88,53 @@ class REST {
 	}
 
 	GetPosition() {
-		return this.fetch('/v1/me/getpositions?product_code=FX_BTC_JPY', null, 'GET');
+		return this.fetch(`/v1/me/getpositions?product_code=${this.symbol}`, null, 'GET');
 	}
 
-	GetOrder(orderId) {
-		return this.fetch('order_info.do', {
-			symbol: this.coin_type,
-			order_id: orderId
-		});
+	GetCollateral() {
+		return this.fetch(`/v1/me/getcollateral?product_code=${this.symbol}`, null, 'GET');
 	}
 
-	GetOrders() {
-		return this.fetch('/v1/me/getchildorders', {
+	GetOrders(orderId) {
+		let params = {
 			product_code: this.symbol,
 			child_order_state: 'ACTIVE'
-		}, 'GET');
+		};
+		if (orderId) params.child_order_acceptance_id = orderId;
+		return this.fetch('/v1/me/getchildorders', params, 'GET');
 	}
 
 	Trade(type, price, amount) {
 		let params = {
-			symbol: this.coin_type,
-			type,
+			product_code: this.symbol,
+			child_order_type: "LIMIT",
+			side: type === 'Long' ? 'BUY' : 'SELL',
 			price,
-			amount
+			size: amount
 		};
-		if (type == 'buy_market') {
-			params.price = params.amount;
-			delete(params.amount);
-		}
-		if (type == 'sell_market') {
-			delete(params.price);
-		}
-		return this.fetch('trade.do', params);
-	}
-
-	Buy(price, amount) {
-		let action = 'buy';
-		if (N.equal(price, -1)) action = 'buy_market';
-		return this.Trade(action, price, amount);
-	}
-
-	Sell(price, amount) {
-		let action = 'sell';
-		if (N.equal(price, -1)) action = 'sell_market';
-		return this.Trade(action, price, amount);
-	}
-
-
-
-	buy(price, amount) {
-		return this.fetch({
-			method: 'buy',
-			coin_type: this.coin_type,
-			price,
-			amount
+		return this.fetch('/v1/me/sendchildorder', params, 'POST').then(o => {
+			if (o && o.status === -205) throw new ExError(ErrorCode.INSUFFICIENT_BALANCE, JSON.stringify(o));
+			if (o && o.child_order_acceptance_id) return o.child_order_acceptance_id;
+			throw new Error('Bitflyer sendchildorder api returns bad data: ' + JSON.stringify(o));
 		});
 	}
 
-	sell(price, amount) {
-		return this.fetch({
-			method: 'sell',
-			coin_type: this.coin_type,
-			price,
-			amount
+	CancelOrder(orderId) {
+		let params = {
+			product_code: this.symbol,
+			child_order_acceptance_id: orderId
+		};
+		return this.fetch('/v1/me/cancelchildorder', params, 'POST', true).then(() => {
+			return true;
 		});
 	}
 
-	buyMarket(amount) {
-		return this.fetch({
-			method: 'buy_market',
-			coin_type: this.coin_type,
-			amount
-		});
-	}
-
-
-	sellMarket(amount) {
-		return this.fetch({
-			method: 'sell_market',
-			coin_type: this.coin_type,
-			amount
+	CancelPendingOrders() {
+		let params = {
+			product_code: this.symbol
+		};
+		return this.fetch('/v1/me/cancelallchildorders', params, 'POST', true).then(() => {
+			return true;
 		});
 	}
 
