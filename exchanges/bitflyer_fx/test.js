@@ -26,7 +26,7 @@ describe('test Bitflyer', function() {
 	// 
 	
 
-	it('should get order', () => ex.GetOrder('JRF20180620-181440-004938').then(log));
+	it('should get order', () => ex.GetOrder('JRF20180620-183753-349466').then(log));
 
 	it('should get account', () => ex.GetAccount().then(log));
 

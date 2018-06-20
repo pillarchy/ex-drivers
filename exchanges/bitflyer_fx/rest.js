@@ -104,6 +104,7 @@ class REST {
 			params.child_order_acceptance_id = orderId;
 			delete params.child_order_state;
 		}
+		console.log('get order', params);
 		return this.fetch('/v1/me/getchildorders', params, 'GET');
 	}
 
