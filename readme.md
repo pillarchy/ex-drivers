@@ -63,3 +63,35 @@ APIs:
 	...
 ]
 ```
+
+
+
+### ZB now support multiple subscriptions
+```
+let zb = new ex({
+	Currency: 'BTC',
+	BaseCurrency: 'QC',
+	Key: config.zb.key,
+	Secret: config.zb.secret,
+	isWS: true,
+	onDepth(data) {
+		console.log('onDepth', data);
+	},
+	onTicker(data) {
+		console.log('onTicker', data);
+	},
+	onPublicTrades(data) {
+		console.log('onPublicTrades', data);
+	}
+});
+
+//subscribe more data
+zb.SubscribeDepth('EOS', 'QC');
+zb.SubscribeTicker('EOS', 'QC');
+zb.SubscribePublicTrades('EOS', 'QC');
+```
+
+
+
+
+

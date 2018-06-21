@@ -3,6 +3,7 @@ const wait = require('delay');
 const RateLimiter = require('../lib/rate-limit');
 
 class EXCHANGE {
+	
 	constructor(options) {
 		if (!options) options = {};
 		ok(options.Currency, 'no Currency in options');

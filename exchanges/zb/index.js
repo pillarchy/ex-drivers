@@ -2,7 +2,6 @@ const WS = require('./ws.js');
 const REST = require('./rest.js');
 const N = require('precise-number');
 const debug = require('debug')('exchange:zb');
-const RateLimit = require('../../lib/rate-limit');
 const EXCHANGE = require('../exchange.js');
 
 class ZB extends EXCHANGE {
@@ -15,12 +14,11 @@ class ZB extends EXCHANGE {
 			},
 			RateLimit: 15,
 			MinTradeAmount: 0.001,
-			DefaultDepthSize: 30
+			DefaultDepthSize: 30,
+			Currency: 'BTC',
+			BaseCurrency: 'QC'
 		}, options);
 		super(options);
-
-		this.Currency = this.options.Currency;
-		this.BaseCurrency = this.options.BaseCurrency;
 
 		if (this.options.isWS) {
 			this.ws = new WS(this.options);
@@ -36,9 +34,31 @@ class ZB extends EXCHANGE {
 		return this.options.isWS ? this.ws : this.rest;
 	}
 
-	async SendWSCommand(cmd) {
-		await this.waitUntilWSReady();
-		await this.ws.ws.send(cmd);
+	async SubscribeDepth(currency, baseCurrency) {
+		try {
+			await this.ws.waitUntilWSReady();
+			await this.ws.addSubscription(currency, baseCurrency, 'depth');
+		} catch (err) {
+			console.error(this.GetName() + ` SubscribeDepth got error:`, err);
+		}
+	}
+
+	async SubscribeTicker(currency, baseCurrency) {
+		try {
+			await this.ws.waitUntilWSReady();
+			await this.ws.addSubscription(currency, baseCurrency, 'ticker');
+		} catch (err) {
+			console.error(this.GetName() + ` SubscribeTicker got error:`, err);
+		}
+	}
+
+	async SubscribePublicTrades(currency, baseCurrency) {
+		try {
+			await this.ws.waitUntilWSReady();
+			await this.ws.addSubscription(currency, baseCurrency, 'trades');
+		} catch (err) {
+			console.error(this.GetName() + ` SubscribePublicTrades got error:`, err);
+		}
 	}
 
 	GetAccount() {
@@ -51,10 +71,10 @@ class ZB extends EXCHANGE {
 				FrozenStocks: 0
 			};
 			data.coins.map(a => {
-				if (a.key === this.BaseCurrency.toLowerCase()) {
+				if (a.key === this.options.BaseCurrency.toLowerCase()) {
 					re.Balance = N.parse(a.available);
 					re.FrozenBalance = N.parse(a.freez);
-				} else if (a.key.toUpperCase() === this.Currency) {
+				} else if (a.key.toUpperCase() === this.options.Currency) {
 					re.Stocks = N.parse(a.available);
 					re.FrozenStocks = N.parse(a.freez);
 				} else if (a.key.toUpperCase() === 'ZB') {
