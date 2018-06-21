@@ -13,7 +13,10 @@ class BITFINEX extends EXCHANGE {
 				Maker: 0.002,
 				Taker: 0.002
 			},
-			RateLimit: 10
+			RateLimit: 10,
+			MinTradeStocks: 0.01,
+			Currency: 'BTC',
+			BaseCurrency: 'USD'
 		}, options);
 		super(options);
 
@@ -52,12 +55,12 @@ class BITFINEX extends EXCHANGE {
 		return Promise.resolve(re);
 	}
 
-	GetTicker() {
-		return this.rest.GetTicker();
+	GetAccounts(type = 'exchange') {
+		return this.rest.GetAccounts(type);
 	}
 
-	GetMin() {
-		return 0.01;
+	GetTicker() {
+		return this.rest.GetTicker();
 	}
 
 	Buy(price, amount) {
