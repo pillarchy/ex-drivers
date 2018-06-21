@@ -3,7 +3,6 @@ const { ok } = require('assert');
 const R = require('ramda');
 const moment = require('moment');
 const WebSocket = require("rpc-websockets").Client;
-const wait = require('delay');
 const REST = require('./rest.js');
 const EventEmitter = require('events');
 const EXCHANGE = require('../exchange.js');
@@ -25,13 +24,14 @@ class EX extends EXCHANGE {
 			MinTradeStocks: 0.01,
 			BaseCurrency: 'JPY',
 			Currency: 'BTC',
-			MarginLevel: 3
+			MarginLevel: 3,
+			SnapshotMode: true
 		}, options);
 		super(options);
 
 		this.Currency = options.Currency;
 		this.options = options;
-		this.symbol = options.Currency + '_JPY';
+		this.symbol = 'FX_' + options.Currency + '_' + options.BaseCurrency;
 
 		this.fee = {
 			Maker: 0,
@@ -53,20 +53,23 @@ class EX extends EXCHANGE {
 			this.ws = new WebSocket("wss://ws.lightstream.bitflyer.com/json-rpc");
 
 			this.ws.on("open", () => {
-				console.log('ws on open');
+				console.log('bitflyer_fx ws on open');
 				this.ws.call("subscribe", {
-					channel: "lightning_board_snapshot_FX_BTC_JPY" 
+					channel: "lightning_board_snapshot_" + this.symbol
 				});
-				this.ws.call("subscribe", {
-					channel: "lightning_board_FX_BTC_JPY" 
-				});
+
+				if (!this.options.SnapshotMode) {
+					this.ws.call("subscribe", {
+						channel: "lightning_board_" + this.symbol
+					});
+				}
 			});
 
 			this.ws.on("channelMessage", notify => {
 				//console.log(notify);
-				if (notify.channel === 'lightning_board_snapshot_FX_BTC_JPY') {
+				if (notify.channel === 'lightning_board_snapshot_' + this.symbol) {
 					this.buildOrderBook(notify.message);
-				} else if (notify.channel === 'lightning_board_FX_BTC_JPY') {
+				} else if (notify.channel === 'lightning_board_' + this.symbol) {
 					this.updateOrderBook(notify.message);
 				} else {
 					console.error('unkonwn event', notify);
@@ -89,7 +92,7 @@ class EX extends EXCHANGE {
 			});
 		}
 		this.wsReady = true;
-		return this.orderbook;
+		this.onDepthData();
 	}
 
 	updateOrderBook(data) {
@@ -173,8 +176,8 @@ class EX extends EXCHANGE {
 		}).filter(d => d.Amount > 0);
 
 		let depth = {
-			Asks: R.sort( R.ascend( R.prop('Price') ), asks).slice(0, 40),
-			Bids: R.sort( R.descend( R.prop('Price') ), bids).slice(0, 40)
+			Asks: R.sort( R.ascend( R.prop('Price') ), asks),
+			Bids: R.sort( R.descend( R.prop('Price') ), bids)
 		};
 
 		if (typeof this.options.onDepth === 'function') {
@@ -284,7 +287,7 @@ class EX extends EXCHANGE {
 		let positions = await this.GetPosition();
 		let re = {
 			Amount: 0,
-			ContractType: 'FX_BTC_JPY',
+			ContractType: this.symbol,
 			Price: 0,
 			MarginLevel: 0	
 		};

@@ -6,10 +6,11 @@ let ex = new EX({
 	Key: config.bitflyer.key,
 	Secret: config.bitflyer.secret,
 	Currency: 'BTC',
-	isWS: false,
+	isWS: true,
+	SnapshotMode: false,
 	onDepth: (depth) => {
 		// console.log('on depth');
-		// console.log(depth);
+		console.log(depth);
 	}
 });
 
@@ -62,8 +63,8 @@ describe('test Bitflyer', function() {
 	// 	console.log(await ex.CancelPendingOrders());
 	// });
 
-	// it('should wait for a long time', function() {
-	// 	this.timeout(1000000000);
-	// 	return wait(1000000000);
-	// });
+	it('should wait for a long time', function() {
+		this.timeout(1000000000);
+		return wait(1000000000);
+	});
 });
