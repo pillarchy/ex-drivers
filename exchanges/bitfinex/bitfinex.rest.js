@@ -4,24 +4,20 @@ const R = require('ramda');
 const qs = require('querystring');
 const crypto = require('crypto');
 const assert = require('assert');
-
-function wait(ms) {
-	return new Promise( d => setTimeout(d, ms) );
-}
-
+const ExError = require('../../lib/error');
+const ErrorCode = require('../../lib/error-code');
+const debug = require('debug')('exchange:bitfinex:rest');
 
 class Bitfinex {
 
 	constructor(options) {
-		this.debug = false;
 		this.key = options.Key;
 		this.secret = options.Secret;
-		if (!options.Currency) options.Currency = 'BTC';
 		this.options = options;
-		this.symbol = options.Currency.toLowerCase() + 'usd';
+		this.symbol = options.Currency.toLowerCase() + options.BaseCurrency.toLowerCase();
 	}
 
-	fetch(url, params, method, isPublic) {
+	async fetch(url, params, method, isPublic) {
 
 		const baseUrl = 'https://api.bitfinex.com';
 		if (params && isPublic) url += '?' + qs.stringify(params);
@@ -48,17 +44,22 @@ class Bitfinex {
 		}
 
 		let httpMethod = method ? method : 'POST';
-
-		return fetch(completeURL, {
+		let fetchOptions = {
 			method: httpMethod,
 			timeout: httpMethod === 'GET' ? 10000 : 10000,
-			body,
 			headers
-		}).then(res => res.text()).then(t => {
-			if (this.debug) {
-				console.log('>>' + t);
-			}
-			if (!t) return Promise.reject('Bitfinex returns empty: ' + url);
+		};
+
+		if (body) fetchOptions.body = body;
+
+		debug('fetching', completeURL, fetchOptions);
+		return fetch(completeURL, fetchOptions).then(async res => {
+			let t = await res.text();
+			let status = res.status;
+			debug('fetched', completeURL, 'status=' + status, t);
+			if (status === 404) throw new ExError(ErrorCode.URL_NOT_FOUND, `${completeURL} 404 not found`);
+
+			if (!t) return Promise.reject('Bitfinex returns empty(' + status + '): ' + completeURL);
 			try {
 				let d = JSON.parse(t);
 				if (Object.keys(d).length === 1 && d.message) {
@@ -70,76 +71,7 @@ class Bitfinex {
 				return Promise.reject('Bitfinex JSON parse error: ' + t);
 			}
 		});
-
-		// .then(json=>{
-		// 	if (json && json.error_code) {
-		// 		json.error_message = errorMessage(json.error_code);
-		// 		throw new Error(JSON.stringify(json));
-		// 	} else {
-		// 		return Promise.resolve(json);
-		// 	}
-		// });
 	}
-
-
-	// fetch2(url, params, method, isPublic) {
-
-	// 	const baseUrl = 'https://api.bitfinex.com/';
-	// 	if (params && isPublic) url += '?' + qs.stringify(params);
-	// 	const completeURL = baseUrl + url;
-	// 	let headers = {}, body = '';
-
-	// 	if (!isPublic) {
-	// 		const nonce = Date.now().toString();
-	// 		body = JSON.stringify(params || {});
-	// 		let signature = `/api/${url}${nonce}${body}`;
-	// 		signature = crypto.createHmac('sha384', this.secret).update(signature).digest('hex');
-
-	// 		headers = {
-	// 			'bfx-nonce': nonce,
-	// 			'bfx-apikey': this.key,
-	// 			'bfx-signature': signature,
-	// 			'Content-Type': 'application/json'
-	// 		};
-	// 	}
-
-	// 	if (this.debug) {
-	// 		console.log('<< '+method+' '+completeURL+'  BODY:'+"\n"+body);
-	// 	}
-
-	// 	let httpMethod = method ? method : 'POST';
-
-	// 	return fetch(completeURL, {
-	// 		method: httpMethod,
-	// 		timeout: httpMethod === 'GET' ? 10000 : 10000,
-	// 		body,
-	// 		headers
-	// 	}).then(res=>res.text()).then(t=>{
-	// 		if (this.debug) {
-	// 			console.log('>>'+t);
-	// 		}
-	// 		if (!t) return Promise.reject('Bitfinex returns empty: '+url);
-	// 		try {
-	// 			var d = JSON.parse(t);
-	// 			if (Object.keys(d).length === 1 && d.message) {
-	// 				return Promise.reject(d.message);
-	// 			} else {
-	// 				return Promise.resolve(d);
-	// 			}
-	// 		} catch( err ) {
-	// 			return Promise.reject('Bitfinex JSON parse error: '+t);
-	// 		}
-	// 	});
-
-	// 	// .then(json=>{
-	// 	// 	if (json && json.error_code) {
-	// 	// 		json.error_message = errorMessage(json.error_code);
-	// 	// 		throw new Error(JSON.stringify(json));
-	// 	// 	} else {
-	// 	// 		return Promise.resolve(json);
-	// 	// 	}
-	// 	// });
-	// }
 
 	GetTicker() {
 		return this.fetch('/v1/pubticker/' + this.symbol, null, 'GET', true).then(data => {
@@ -150,7 +82,7 @@ class Bitfinex {
 				Sell: N.parse(data.ask),
 				Last: N.parse(data.last_price),
 				Volume: N.parse(data.volume),
-				Time: data.timestamp
+				Time: Math.floor(data.timestamp * 1000)
 			});
 		});
 	}
@@ -185,7 +117,7 @@ class Bitfinex {
 			});
 
 			return Promise.resolve({
-				Asks: R.sort( R.descend( R.prop('Price') ), asks),
+				Asks: R.sort( R.ascend( R.prop('Price') ), asks),
 				Bids: R.sort( R.descend( R.prop('Price') ), bids)
 			});
 		});
@@ -194,16 +126,14 @@ class Bitfinex {
 
 	GetAccount() {
 		return this.fetch('/v1/balances', null, 'POST').then(accounts => {
-
-			// console.log(JSON.stringify(accounts));
-
 			let currency = this.options.Currency.toLowerCase();
-			let fiat = 'usd';
+			let fiat = this.options.BaseCurrency.toLowerCase();
 			let re = {
 				Balance: 0,
 				Stocks: 0,
 				FrozenStocks: 0,
-				FrozenBalance: 0
+				FrozenBalance: 0,
+				Info: accounts
 			};
 
 			accounts.map(account => {
@@ -215,14 +145,29 @@ class Bitfinex {
 						re.Balance = N.parse(account.available);
 						re.FrozenBalance = N.minus(account.amount, account.available);
 					}
-
-					re[(account.currency + '').toUpperCase()] = {
-						Available: N.parse(account.available),
-						Frozen: N.minus(account.amount, account.available)
-					};
 				}
 			});
 
+			return re;
+		});
+	}
+
+	GetAccounts(type = 'exchange') {
+		return this.fetch('/v1/balances', null, 'POST').then(accounts => {
+
+			if (type !== 'all') {
+				accounts = accounts.filter(a => a.type === type);
+			}
+
+			let re = [];
+			accounts.map(a => {
+				re.push({
+					Currency: String(a.currency).toUpperCase(),
+					Free: N.parse(a.available),
+					Frozen: N(a.amount).minus(a.available) * 1,
+					Info: a
+				});
+			});
 			return re;
 		});
 	}

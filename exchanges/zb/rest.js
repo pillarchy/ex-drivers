@@ -108,6 +108,18 @@ class EXCHANGE {
 		});
 	}
 
+	GetTrades(page = 1) {
+		return this.request({
+			currency: this.symbol,
+			method: 'getOrdersIgnoreTradeType',
+			pageIndex: page,
+			pageSize: 100
+		}).then(arr => arr.map(o => this._transform_order(o))).catch(err => {
+			if (err && err.type === 'request-timeout') throw `zb getTrades timed out`;
+			throw err;
+		});
+	}
+
 	_getSymbol(currency) {
 		return (!currency) ? this.symbol : currency.toLowerCase() + '_' + this.BaseCurrency.toLowerCase();
 	}
@@ -208,7 +220,8 @@ class EXCHANGE {
 			DealAmount: N.parse(o.trade_amount),
 			Type: (o.type && o.type * 1 === 1) ? 'Buy' : 'Sell',
 			Time: N.parse(o.trade_date),
-			Status: _order_status(o.status * 1)
+			Status: _order_status(o.status * 1),
+			Info: o
 		};
 
 		if (re.DealAmount === 0 && re.Status === 'Partial') re.Status = 'Pending';

@@ -11,8 +11,11 @@ const Exchange = new OKCoin({
 	Currency: 'ETH',
 	BaseCurrency: 'BTC',
 	isWS: true,
-	onAccountChange(a) {
-		console.log('on account change', a);
+	// onAccountChange(a) {
+	// 	console.log('on account change', a);
+	// },
+	onIndex(index) {
+		console.log('on index', index);
 	}
 });
 

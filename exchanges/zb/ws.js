@@ -28,6 +28,12 @@ class EXCHANGE {
 
 		this.ws = new WebSocket('wss://api.bitkk.com:9999/websocket');
 
+		this.symbols = {};
+		this.symbols[this.symbol] = {
+			Currency: this.options.Currency,
+			BaseCurrency: this.options.BaseCurrency
+		};
+
 		this.wsReady = false;
 		this.ws.on('open', () => {
 
@@ -54,7 +60,7 @@ class EXCHANGE {
 				}));
 			}
 
-			if (this.options.onTrades) {
+			if (this.options.onPublicTrades) {
 				this.ws.send(JSON.stringify({
 					event: 'addChannel',
 					channel: this.symbol + '_trades'
@@ -99,22 +105,41 @@ class EXCHANGE {
 		} else if (data.dataType === 'ticker') {
 			this.onTicker(data);
 		} else if (data.dataType === 'trades') {
-			this.onTrades(data);
+			this.onPublicTrades(data);
 		} else {
 			this.handleOnce(data);
 		}
 	}
 
+	addSubscription(Currency, BaseCurrency, type) {
+		let symbol = String(Currency + BaseCurrency).toLowerCase();
+		this.symbols[symbol] = {
+			Currency,
+			BaseCurrency
+		};
+
+		this.ws.send(JSON.stringify({
+			event: 'addChannel',
+			channel: symbol + '_' + type
+		}));
+	}
+
 	onDepth(data) {
-		if (!data.asks || !data.bids) return;
-		let asks = data.asks.map(pair => {
+		let { asks, bids, channel, timestamp } = data;
+		if (!asks || !bids || !channel || !timestamp) return;
+
+		channel = channel.replace(/\_\w+/, '');
+		let info = this.symbols[channel];
+		if (!info) return;
+
+		asks = asks.map(pair => {
 			return {
 				Price: N.parse(pair[0]),
 				Amount: N.parse(pair[1])
 			};
 		});
 
-		let bids = data.bids.map(pair => {
+		bids = bids.map(pair => {
 			return {
 				Price: N.parse(pair[0]),
 				Amount: N.parse(pair[1])
@@ -122,8 +147,10 @@ class EXCHANGE {
 		});
 
 		let depth = {
+			Time: Math.round(timestamp * 1000),
 			Asks: R.sort( R.ascend( R.prop('Price') ), asks),
-			Bids: R.sort( R.descend( R.prop('Price') ), bids)
+			Bids: R.sort( R.descend( R.prop('Price') ), bids),
+			...info
 		};
 
 		if( this.options.MultipleDepth ){
@@ -134,39 +161,70 @@ class EXCHANGE {
 	}
 
 	onTicker(data) {
-		if (!data.ticker) return;
-		let t = data.ticker;
+		let { date, channel, ticker } = data;
+		if (!date || !channel || !ticker) return;
+
+		channel = channel.replace(/\_\w+/, '');
+		let info = this.symbols[channel];
+		if (!info) return;
+
 		this.options.onTicker({
-			Buy: N.parse(t.buy),
-			Sell: N.parse(t.sell),
-			High: N.parse(t.high),
-			Last: N.parse(t.last),
-			Low: N.parse(t.low),
-			Volume: N.parse(t.vol)
+			Buy: N.parse(ticker.buy),
+			Sell: N.parse(ticker.sell),
+			High: N.parse(ticker.high),
+			Last: N.parse(ticker.last),
+			Low: N.parse(ticker.low),
+			Volume: N.parse(ticker.vol),
+			Time: N.parse(date),
+			...info
 		});
 	}
 
-	onTrades(data) {
+	onPublicTrades(data) {
 		/*
-		{ amount: '0.010',
-		    price: '689.37',
-		    tid: 2395393,
-		    type: 'buy',
-		    date: 1513263322,
-		    trade_type: 'bid' },
+		{ dataType: 'trades',
+		  data:
+		   [ { amount: '0.0011',
+		       price: '44273.49',
+		       tid: 103779201,
+		       date: 1529603755,
+		       type: 'buy',
+		       trade_type: 'bid' },
+		     { amount: '0.0099',
+		       price: '44286.41',
+		       tid: 103779202,
+		       date: 1529603755,
+		       type: 'buy',
+		       trade_type: 'bid' },
+		     { amount: '0.0061',
+		       price: '44293.53',
+		       tid: 103779203,
+		       date: 1529603755,
+		       type: 'buy',
+		       trade_type: 'bid' } ],
+		  channel: 'btcqc_trades' }
 		 */
-		if (!data.data) return;
+		let { channel } = data;
+		if (!channel) return;
+
+		channel = channel.replace(/\_\w+/, '');
+		let info = this.symbols[channel];
+		if (!info) return;
+
 		let trades = data.data;
+		if (!trades) return;
+
 		if (trades && trades.length > 0) {
 			trades = trades.map(t => ({
 				Amount: N.parse(t.amount),
 				Price: N.parse(t.price),
 				Type: t.type === 'buy' ? 'Buy' : 'Sell',
 				Time: Math.floor(t.date * 1000),
-				Id: t.tid
+				Id: t.tid,
+				...info
 			}));
 		}
-		this.options.onTrades(trades);
+		this.options.onPublicTrades(trades);
 	}
 
 	GetName() {

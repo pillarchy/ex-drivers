@@ -1,5 +1,6 @@
 module.exports = {
 	OKEX: require('./exchanges/okex/index.js'),
+	OKEX_FUTURE: require('./exchanges/okex_future/index.js'),
 	BINANCE: require('./exchanges/binance/index.js'),
 	BITFINEX: require('./exchanges/bitfinex/index.js'),
 	BITFLYER_FX: require('./exchanges/bitflyer_fx/index.js'),

@@ -3,19 +3,36 @@ const { ok } = require('assert');
 const R = require('ramda');
 const moment = require('moment');
 const WebSocket = require("rpc-websockets").Client;
-const wait = require('delay');
 const REST = require('./rest.js');
 const EventEmitter = require('events');
+const EXCHANGE = require('../exchange.js');
+const ExError = require('../../lib/error');
+const ErrorCode = require('../../lib/error-code');
 
-class EXCHANGE {
+class EX extends EXCHANGE {
 	constructor(options) {
-		if (!options.Currency) options.Currency = 'BTC';
+
+		options = Object.assign({
+			Name: 'BITFLYER_FX',
+			Fees: {
+				Maker: 0,
+				Taker: 0
+			},
+			RateLimit: 10,
+			Decimals: 0,
+			StockDecimals: 3,
+			MinTradeStocks: 0.01,
+			BaseCurrency: 'JPY',
+			Currency: 'BTC',
+			MarginLevel: 3,
+			SnapshotMode: true
+		}, options);
+		super(options);
+
 		this.Currency = options.Currency;
 		this.options = options;
-		this.symbol = options.Currency + '_JPY';
+		this.symbol = 'FX_' + options.Currency + '_' + options.BaseCurrency;
 
-		this.rate = options.Rate || 0.008913331224;
-	
 		this.fee = {
 			Maker: 0,
 			Taker: 0
@@ -36,20 +53,23 @@ class EXCHANGE {
 			this.ws = new WebSocket("wss://ws.lightstream.bitflyer.com/json-rpc");
 
 			this.ws.on("open", () => {
-				console.log('ws on open');
+				console.log('bitflyer_fx ws on open');
 				this.ws.call("subscribe", {
-					channel: "lightning_board_snapshot_FX_BTC_JPY" 
+					channel: "lightning_board_snapshot_" + this.symbol
 				});
-				this.ws.call("subscribe", {
-					channel: "lightning_board_FX_BTC_JPY" 
-				});
+
+				if (!this.options.SnapshotMode) {
+					this.ws.call("subscribe", {
+						channel: "lightning_board_" + this.symbol
+					});
+				}
 			});
 
 			this.ws.on("channelMessage", notify => {
 				//console.log(notify);
-				if (notify.channel === 'lightning_board_snapshot_FX_BTC_JPY') {
+				if (notify.channel === 'lightning_board_snapshot_' + this.symbol) {
 					this.buildOrderBook(notify.message);
-				} else if (notify.channel === 'lightning_board_FX_BTC_JPY') {
+				} else if (notify.channel === 'lightning_board_' + this.symbol) {
 					this.updateOrderBook(notify.message);
 				} else {
 					console.error('unkonwn event', notify);
@@ -72,7 +92,7 @@ class EXCHANGE {
 			});
 		}
 		this.wsReady = true;
-		return this.orderbook;
+		this.onDepthData();
 	}
 
 	updateOrderBook(data) {
@@ -138,41 +158,26 @@ class EXCHANGE {
 		this.onDepthData();
 	}
 
-
-	async waitUntilWSReady() {
-		let startTime = Date.now();
-		while (true) {
-			if (Date.now() - startTime > 30000) throw new Error('bitflyer websocket ready timeout');
-			if (!this.wsReady) {
-				await wait(200);
-			} else {
-				break;
-			}
-		}
-		return true;
-	}
-
-
 	onDepthData() {
 		if (!this.orderbook) return;
 
 		let asks = Object.keys(this.orderbook.Asks).map(price => {
 			return {
-				Price: N(price).multiply(this.rate).floor(2) * 1,
+				Price: N.parse(price),
 				Amount: N.parse(this.orderbook.Asks[price])
 			};
 		}).filter(d => d.Amount > 0);
 
 		let bids = Object.keys(this.orderbook.Bids).map(price => {
 			return {
-				Price: N(price).multiply(this.rate).floor(2) * 1,
+				Price: N.parse(price),
 				Amount: N.parse(this.orderbook.Bids[price])
 			};
 		}).filter(d => d.Amount > 0);
 
 		let depth = {
-			Asks: R.sort( R.descend( R.prop('Price') ), asks).slice(-40),
-			Bids: R.sort( R.descend( R.prop('Price') ), bids).slice(0, 40)
+			Asks: R.sort( R.ascend( R.prop('Price') ), asks),
+			Bids: R.sort( R.descend( R.prop('Price') ), bids)
 		};
 
 		if (typeof this.options.onDepth === 'function') {
@@ -197,14 +202,6 @@ class EXCHANGE {
 		}
 	}
 
-	GetFee() {
-		return this.fee;
-	}
-
-	GetName() {
-		return this.options.Name ? this.options.Name : 'Bitflyer';
-	}
-
 	GetTicker() {
 		/*
 		{ product_code: 'BTC_JPY',
@@ -222,199 +219,267 @@ class EXCHANGE {
 		 */
 		return this.rest.GetTicker().then(data => {
 			return {
-				Buy: N(data.best_bid).multiply(this.rate).floor(2),
-				Sell: N(data.best_ask).multiply(this.rate).floor(2),
-				Last: N(data.best_bid).add(data.best_ask).div(2).multiply(this.rate).floor(2),
+				Buy: N.parse(data.best_bid),
+				Sell: N.parse(data.best_ask),
+				Last: N(data.best_bid).add(data.best_ask).div(2) * 1,
 				Time: moment(data.timestamp).format('x') * 1,
-				High: N(data.best_ask).multiply(this.rate).floor(2),
-				Low: N(data.best_bid).multiply(this.rate).floor(2),
+				High: N.parse(data.best_ask),
+				Low: N.parse(data.best_bid),
 				Volume: N.parse(data.volume_by_product)
 			};
 		});
 	}
 
 	GetCollateral() {
-		return new Promise((done, reject) => {
-			this.rest.getCollateral((err, data) => {
-				if (err)
-				{reject(err);}
-				else
-				{done(data);}
-			});
-		}).then(data => {
-			return data;
-		});
+		return this.rest.GetCollateral();
 	}
 
 	GetPosition() {
-		return this.rest.GetPosition();
-	}
-
-	GetAccount() {
-		return this.rest.GetAccount().then(data => {
-			console.log(data);
-			if (data && data.length > 0) {
+		/*
+		[ { product_code: 'FX_BTC_JPY',
+		    side: 'SELL',
+		    price: 748756,
+		    size: 0.01,
+		    commission: 0,
+		    swap_point_accumulate: 0,
+		    require_collateral: 2495.8533333333335,
+		    open_date: '2018-06-20T09:10:42.083',
+		    leverage: 3,
+		    pnl: 3.19,
+		    sfd: 0 } ]
+		 [ { product_code: 'FX_BTC_JPY',
+		     side: 'BUY',
+		     price: 748324,
+		     size: 0.01,
+		     commission: 0,
+		     swap_point_accumulate: 0,
+		     require_collateral: 2494.4133333333334,
+		     open_date: '2018-06-20T09:13:42.577',
+		     leverage: 3,
+		     pnl: -1.06,
+		     sfd: 0 } ]
+		 */
+		return this.rest.GetPosition().then(positions => {
+			return positions.map(p => {
 				let re = {
-					Balance: null,
-					FrozenBalance: 0,
-					Stocks: null,
-					FrozenStocks: 0
+					Amount: N.parse(p.size),
+					MarginLevel: N.parse(p.leverage),
+					FrozenAmount: 0,
+					Price: N.parse(p.price),
+					Type: p.side === 'BUY' ? 'Long' : 'Short',
+					ContractType: p.product_code,
+					Info: p
 				};
-				data.map(r => {
-					if (r.currency_code === this.Currency) {
-						re.Stocks = N.parse(r.amount);
-						// re.FrozenStocks = N(r.amount).minus(r.available)*1;
-					} else if (r.currency_code === 'JPY') {
-						re.Balance = N(r.amount).multiply(this.rate).floor(2) * 1;
-						// re.FrozenBalance = N(r.amount).minus(r.available).multiply(this.rate).floor(2)*1;
-					}
-				});
-
-				if (re.Balance === null || re.FrozenBalance === null || re.Stocks === null || re.FrozenStocks === null) {
-					throw new Error(this.GetName() + 'GetAccount returns error: ' + JSON.stringify(data));
-				}
-
 				return re;
-			} else {
-				throw new Error(this.GetName() + 'GetAccount return error: ' + JSON.stringify(data));
-			}
+			});
+		}).then(positions => {
+			if (positions.length <= 1) return positions;
+			let longPosition = this._merge_position(positions, 'Long');
+			let shortPosition = this._merge_position(positions, 'Short');
+			let re = [];
+			if (longPosition) re.push(longPosition);
+			if (shortPosition) re.push(shortPosition);
+			return re;
 		});
 	}
 
-	GetOrders() {
-		return this.rest.GetOrders();
+	async GetNetPosition() {
+		let positions = await this.GetPosition();
+		let re = {
+			Amount: 0,
+			ContractType: this.symbol,
+			Price: 0,
+			MarginLevel: 0	
+		};
+
+		positions.map( p => {
+			if (p.Type === 'Long') {
+				re.Amount = p.Amount;
+				re.Price = p.Price;
+				re.MarginLevel = p.MarginLevel;
+			} else {
+				re.Amount = -1 * p.Amount;
+				re.Price = p.Price;
+				re.MarginLevel = p.MarginLevel;
+			}
+		});
+
+		return re;
 	}
 
+	_merge_position(positions, type) {
+		let arr = positions.filter(p => p.Type === type);
+		if (arr.length === 1) return arr[0];
+		if (arr.length === 0) return null;
+		let position = {
+			Type: type,
+			Amount: 0,
+			MarginLevel: 0,
+			FrozenAmount: 0,
+			Price: 0,
+			ContractType: '',
+			Info: []
+		};
+		arr.map(p => {
+			position.Amount = N(p.Amount).add(position.Amount) * 1;
+			position.Price = N(p.Price).multiply(p.Amount).add(position.Price) * 1;
+			position.MarginLevel = p.MarginLevel;
+			position.ContractType = p.ContractType;
+			position.Info.push(p);
+		});
+
+		position.Price = N(position.Price).div(position.Amount).floor(0);
+
+		return position;
+	}
+
+	async GetAccount() {
+		/*
+		{ collateral: 48918.872,
+		  open_position_pnl: 0,
+		  require_collateral: 0,
+		  keep_rate: 0 }
+		 */
+		let info = await this.rest.GetCollateral();
+		let total = info.collateral || 0;
+		let totalBalance = Math.floor(total / 0.8);
+		let usedBalance = Math.floor(info.require_collateral);
+
+		return {
+			Balance: Math.floor(totalBalance - usedBalance),
+			FrozenBalance: usedBalance,
+			Stocks: 0,
+			FrozenStocks: 0,
+			MarginLevel: info.keep_rate > 0 ? (N(1).div(info.keep_rate).multiply(this.options.MarginLevel) * 1) : 0,
+			Info: info
+		};
+
+		// return this.rest.GetAccount().then(data => {
+		// 	console.log(data);
+		// 	if (data && data.length > 0) {
+		// 		let re = {
+		// 			Balance: null,
+		// 			FrozenBalance: 0,
+		// 			Stocks: null,
+		// 			FrozenStocks: 0
+		// 		};
+		// 		data.map(r => {
+		// 			if (r.currency_code === this.Currency) {
+		// 				re.Stocks = N.parse(r.amount);
+		// 			} else if (r.currency_code === 'JPY') {
+		// 				re.Balance = N.parse(r.amount);
+		// 			}
+		// 		});
+
+		// 		if (re.Balance === null || re.FrozenBalance === null || re.Stocks === null || re.FrozenStocks === null) {
+		// 			throw new Error(this.GetName() + 'GetAccount returns error: ' + JSON.stringify(data));
+		// 		}
+
+		// 		return re;
+		// 	} else {
+		// 		throw new Error(this.GetName() + 'GetAccount return error: ' + JSON.stringify(data));
+		// 	}
+		// });
+	}
+
+	GetOrders() {
+		/*
+		[ { id: 0,
+		    child_order_id: 'JFX20180620-092321-465119F',
+		    product_code: 'FX_BTC_JPY',
+		    side: 'SELL',
+		    child_order_type: 'LIMIT',
+		    price: 760550,
+		    average_price: 0,
+		    size: 0.01,
+		    child_order_state: 'ACTIVE',
+		    expire_date: '2018-07-20T09:23:20',
+		    child_order_date: '2018-06-20T09:23:20',
+		    child_order_acceptance_id: 'JRF20180620-092320-723852',
+		    outstanding_size: 0.01,
+		    cancel_size: 0,
+		    executed_size: 0,
+		    total_commission: 0 } ]
+		 */
+		return this.rest.GetOrders().then(orders => orders.map(o => this._transform_order(o)));
+	}
+
+	_transform_order(o) {
+		return {
+			Id: o.child_order_acceptance_id,
+			Price: N.parse(o.price),
+			Amount: N.parse(o.size),
+			DealAmount: N.parse(o.executed_size),
+			Type: o.side === 'BUY' ? 'Long' : 'Short',
+			Time: moment(o.child_order_date).format('x') * 1,
+			Status: this._order_status(o.child_order_state),
+			ContractType: o.product_code,
+			Info: o
+		};
+	}
 
 	GetOrder(orderId) {
-		/*
-		{ 
-			  "symbol": "LTCBTC",
-			  "orderId": 1,
-			  "clientOrderId": "myOrder1",
-			  "price": "0.1",
-			  "origQty": "1.0",
-			  "executedQty": "0.0",
-			  "status": "NEW",
-			  "timeInForce": "GTC",
-			  "type": "LIMIT",
-			  "side": "BUY",
-			  "stopPrice": "0.0",
-			  "icebergQty": "0.0",
-			  "time": 1499827319559
-		 }
-		 */
-		return this.rest('queryOrder', {
-			symbol: this.symbol,
-			orderId
-		}).then(o => {
-			return {
-				Id: o.orderId,
-				Price: N.parse(o.price),
-				Amount: N.parse(o.origQty),
-				DealAmount: N.parse(o.executedQty),
-				Type: o.side === 'BUY' ? 'Buy' : 'Sell',
-				Time: N.parse(o.time),
-				Status: this._order_status(o.status)
-			};
+		return this.rest.GetOrders(orderId).then(orders => orders.map(o => this._transform_order(o))).then(orders => {
+			if (!orders || orders.length === 0) {
+				throw new ExError(ErrorCode.ORDER_NOT_FOUND, `order(${orderId}) not found`);
+			}
+
+			if (orders.length === 1) {
+				return orders[0];
+			} else {
+				console.error(orders);
+				throw new ExError(ErrorCode.UNKNOWN_ERROR, 'Bitflyer FX GetOrder returns many orders:' + JSON.stringify(orders));
+			}
 		});
 	}
 
 	_order_status(status) {
 		/*
-		NEW
-		PARTIALLY_FILLED
-		FILLED
-		CANCELED
-		PENDING_CANCEL
-		REJECTED
-		EXPIRED
+		ACTIVE: Return open orders
+		COMPLETED: Return fully completed orders
+		CANCELED: Return orders that have been cancelled by the customer
+		EXPIRED: Return order that have been cancelled due to expiry
+		REJECTED: Return failed orders
 		 */
 		switch (status) {
-				case 'NEW': 
-				case 'PARTIALLY_FILLED': return 'Pending';
-				case 'FILLED': return 'Closed';
+				case 'ACTIVE': return 'Pending';
+				case 'COMPLETED': return 'Closed';
 				case 'CANCELED': return 'Cancelled';
-				case 'PENDING_CANCEL': return 'Cancelled';
 				case 'REJECTED': return 'Cancelled';
 				case 'EXPIRED': return 'Cancelled';
 				default: return status;
 		}
 	}
 
-	GetMin() {
-		return 0.01;
+	Trade(type, price, amount) {
+		amount = N(amount).floor(this.options.StockDecimals);
+		price = N(price).floor(this.options.Decimals);
+
+		ok( amount > 0, 'amount should greater than 0');
+		ok( price > 0, 'price should greater than 0');
+
+		console.log(this.GetName(), type, price, amount);
+		return this.rest.Trade(type, price, amount);
 	}
 
-	Buy(price, amount) {
-		ok( amount > 0, 'amount should greater than 0');
-		amount = N.parse(amount, 4);
-		console.log(this.GetName(), 'Buy', price, amount);
-
-		let params = {
-			symbol: this.symbol,
-			side: 'BUY',
-			type: price === -1 ? 'MARKET' : 'LIMIT',
-			quantity: amount,
-			timestamp: Date.now()
-		};
-		if (price > 0) {
-			params.price = price;
-			params.timeInForce = 'GTC';
-		}
-
-		return this.rest('newOrder', params).then( r => {
-			if (r && r.orderId) return r.orderId;
-			throw new Error(this.GetName() + ' sell failed ' + JSON.stringify(r));
-		});
+	Long(price, amount) {
+		return this.Trade('Long', price, amount);
 	}
 
-	Sell(price, amount) {
-		ok( amount > 0, 'amount should greater than 0');
-		amount = N.parse(amount, 4);
-		console.log(this.GetName(), 'Sell', price, amount);
-
-		let params = {
-			symbol: this.symbol,
-			side: 'SELL',
-			type: price === -1 ? 'MARKET' : 'LIMIT',
-			quantity: amount,
-			timestamp: Date.now()
-		};
-		if (price > 0) {
-			params.price = price;
-			params.timeInForce = 'GTC';
-		}
-		return this.rest('newOrder', params).then( r => {
-			if (r && r.orderId) return r.orderId;
-			throw new Error(this.GetName() + ' sell failed ' + JSON.stringify(r));
-		});
+	Short(price, amount) {
+		return this.Trade('Short', price, amount);
 	}
 
 	CancelOrder(orderId) {
-		return this.rest('cancelOrder', {
-			symbol: this.symbol,
-			orderId,
-			timestamp: Date.now()
-		}).then(result => {
-			return !!result.clientOrderId;
-		});
+		return this.rest.CancelOrder(orderId);
 	}
 
 	CancelPendingOrders() {
 		console.log(this.GetName() + ' cancelling pending orders...');
-		return this.GetOrders().then( orders => {
-			console.log(this.GetName() + ' cancelling', orders.length, 'orders');
-			return Promise.all(orders.map( o => {
-				return this.CancelOrder(o.Id);
-			})).then( results => {
-				console.log(this.GetName(), results);
-				return true;
-			});
-		});
+		return this.rest.CancelPendingOrders();
 	}
 
 }
 
 
-module.exports = EXCHANGE;
+module.exports = EX;

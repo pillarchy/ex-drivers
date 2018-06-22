@@ -2,7 +2,6 @@ const WS = require('./ws.js');
 const REST = require('./rest.js');
 const N = require('precise-number');
 const debug = require('debug')('exchange:zb');
-const RateLimit = require('../../lib/rate-limit');
 const EXCHANGE = require('../exchange.js');
 
 class ZB extends EXCHANGE {
@@ -15,12 +14,11 @@ class ZB extends EXCHANGE {
 			},
 			RateLimit: 15,
 			MinTradeAmount: 0.001,
-			DefaultDepthSize: 30
+			DefaultDepthSize: 30,
+			Currency: 'BTC',
+			BaseCurrency: 'QC'
 		}, options);
 		super(options);
-
-		this.Currency = this.options.Currency;
-		this.BaseCurrency = this.options.BaseCurrency;
 
 		if (this.options.isWS) {
 			this.ws = new WS(this.options);
@@ -36,9 +34,36 @@ class ZB extends EXCHANGE {
 		return this.options.isWS ? this.ws : this.rest;
 	}
 
-	GetAccount(interestedCoins, withInfo) {
+	async SubscribeDepth(currency, baseCurrency) {
+		try {
+			await this.ws.waitUntilWSReady();
+			await this.ws.addSubscription(currency, baseCurrency, 'depth');
+		} catch (err) {
+			console.error(this.GetName() + ` SubscribeDepth got error:`, err);
+		}
+	}
+
+	async SubscribeTicker(currency, baseCurrency) {
+		try {
+			await this.ws.waitUntilWSReady();
+			await this.ws.addSubscription(currency, baseCurrency, 'ticker');
+		} catch (err) {
+			console.error(this.GetName() + ` SubscribeTicker got error:`, err);
+		}
+	}
+
+	async SubscribePublicTrades(currency, baseCurrency) {
+		try {
+			await this.ws.waitUntilWSReady();
+			await this.ws.addSubscription(currency, baseCurrency, 'trades');
+		} catch (err) {
+			console.error(this.GetName() + ` SubscribePublicTrades got error:`, err);
+		}
+	}
+
+	GetAccount() {
 		return this.getHandler().GetAccount().then(data => {
-			if (!data.coins) throw new Error("zb.com GetAccount result error: " + JSON.stringify(data));
+			if (!data.coins) throw new Error("zb GetAccount result error: " + JSON.stringify(data));
 			let re = {
 				Balance: 0,
 				FrozenBalance: 0,
@@ -46,20 +71,15 @@ class ZB extends EXCHANGE {
 				FrozenStocks: 0
 			};
 			data.coins.map(a => {
-				if (a.key === this.BaseCurrency.toLowerCase()) {
+				if (a.key === this.options.BaseCurrency.toLowerCase()) {
 					re.Balance = N.parse(a.available);
 					re.FrozenBalance = N.parse(a.freez);
-				} else if (a.key.toUpperCase() === this.Currency) {
+				} else if (a.key.toUpperCase() === this.options.Currency) {
 					re.Stocks = N.parse(a.available);
 					re.FrozenStocks = N.parse(a.freez);
 				} else if (a.key.toUpperCase() === 'ZB') {
 					re.ZB = N.parse(a.available);
 					re.FrozenZB = N.parse(a.freez);
-				}
-
-				if (interestedCoins && interestedCoins.indexOf(a.key.toUpperCase()) !== -1) {
-					re[a.key.toUpperCase()] = N.parse(a.available);
-					re['Frozen' + a.key.toUpperCase()] = N.parse(a.freez);
 				}
 
 				if (a.key === 'usdt') {
@@ -72,7 +92,23 @@ class ZB extends EXCHANGE {
 					re.FrozenQC = N.parse(a.freez);
 				}
 			});
-			if (withInfo) re.Info = data;
+			re.Info = data;
+			return re;
+		});
+	}
+
+	GetAccounts() {
+		return this.getHandler().GetAccount().then(data => {
+			if (!data.coins) throw new Error("zb GetAccount result error: " + JSON.stringify(data));
+			let re = [];
+			data.coins.map(a => {
+				re.push({
+					Currency: String(a.key).toUpperCase(),
+					Free: N.parse(a.available),
+					Frozen: N.parse(a.freez),
+					Info: a
+				});
+			});
 			return re;
 		});
 	}
@@ -144,6 +180,15 @@ class ZB extends EXCHANGE {
 		}).catch(err => {
 			if (err.code === 3001) return [];
 		});	
+	}
+
+	async GetTrades(page = 1) {
+		let trades = await this.rest.GetTrades(page);
+		trades = trades.map( t => {
+			t.AvgPrice = t.Price;
+			return t;
+		});
+		return trades.filter(o => o.DealAmount > 0);
 	}
 
 	GetOrder(orderId) {

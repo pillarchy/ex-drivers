@@ -54,6 +54,7 @@ class okex {
 		let ws = new WS(socketURL); 
 		this.ws = ws;
 
+		this.channels = channels;
 		channels.addChannel = (data) => {
 			if (data && data.result) {
 				console.log(clor.green('okex websocket channel subscribed').toString(), data.channel);
@@ -120,10 +121,6 @@ class okex {
 
 				let callback = channels[message['channel']];
 				if (!callback) {
-					// if (message.type === 'order' && message.data && this.options.onTrade) {
-					// 	this.options.onTrade(message.data);
-					// }
-					// console.log('unhandled message', clor.red(JSON.stringify(message, null, '\t')) + '');
 					return;
 				} 
 

@@ -66,19 +66,22 @@ class okex {
 			debug('on open');
 			this.connected = true;
 			console.log('okex websocket connected');
-			let loginParams = {
-				api_key: this.key
-			};
-			loginParams.sign = sign(loginParams, this.secret);
-			ws.send(JSON.stringify({
-				event: 'login',
-				parameters: loginParams
-			}).replace(/\"/g, "'"));
 
-			debug('send', {
-				event: 'login',
-				parameters: loginParams
-			});
+			if (this.key && this.key.length > 1) {
+				let loginParams = {
+					api_key: this.key
+				};
+				loginParams.sign = sign(loginParams, this.secret);
+				ws.send(JSON.stringify({
+					event: 'login',
+					parameters: loginParams
+				}).replace(/\"/g, "'"));
+
+				debug('send', {
+					event: 'login',
+					parameters: loginParams
+				});
+			}
 
 
 			Object.keys(channels).map(name => {
@@ -95,6 +98,8 @@ class okex {
 			}, 5000);
 		});
 
+		let connected = false;
+
 		ws.on('message', (data) => {
 			debug('message', data.substr(0, 300));
 			let messages = JSON.parse(data);
@@ -107,9 +112,6 @@ class okex {
 				if (message['channel'] === 'login') {
 					if (message['data'] && message['data'].result) {
 						console.log(clor.green('okex websocket login success').toString());
-						if (this.options.onConnect && typeof this.options.onConnect === 'function') {
-							this.options.onConnect();
-						}
 					} else {
 						console.error(clor.red('okex websocket login faild').toString(), message);
 						process.exit();
@@ -117,6 +119,13 @@ class okex {
 					}
 					return;
 				}
+
+				if (!connected) {
+					if (this.options.onConnect && typeof this.options.onConnect === 'function') {
+						this.options.onConnect();
+					}
+				}
+				connected = true;
 
 				let callback = channels[message['channel']];
 				if (!callback) {

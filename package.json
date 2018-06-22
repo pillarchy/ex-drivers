@@ -1,13 +1,15 @@
 {
   "name": "ex-drivers",
-  "version": "0.0.9",
+  "version": "0.0.21",
   "description": "crypto currency exchange drivers",
   "main": "index.js",
   "dependencies": {
     "bitfinex-api-node": "^1.2.0",
+    "chai": "^4.1.2",
     "clor": "^5.2.0",
     "debug": "^3.1.0",
     "delay": "^2.0.0",
+    "got": "^8.3.1",
     "jsonic": "^0.3.0",
     "moment": "^2.22.1",
     "node-bittrex-api": "^0.7.6",
