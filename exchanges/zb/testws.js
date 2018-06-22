@@ -1,9 +1,9 @@
-const ex = require('./index.js');
+const ExDrivers = require('../../index.js');
 const config = require('../../accounts.config.json');
 const wait = require('delay');
 
 
-let zb = new ex({
+let zb = new ExDrivers.ZB({
 	Currency: 'BTC',
 	BaseCurrency: 'QC',
 	Key: config.zb.key,

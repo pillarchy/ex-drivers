@@ -1,12 +1,11 @@
 const N = require('precise-number');
-const { ok, equal } = require('assert');
+const { ok } = require('assert');
 const WebSocket = require('../../lib/auto-reconnect-ws.js');
 const R = require('ramda');
 const sha1 = require('sha1');
 const crypto = require('crypto');
 const delay = require('delay');
 const debug = require('debug')('exchange:zb:ws');
-const clor = require("clor");
 const wait = require('delay');
 
 class EXCHANGE {
@@ -34,6 +33,9 @@ class EXCHANGE {
 			BaseCurrency: this.options.BaseCurrency
 		};
 
+		//remember subscription commands
+		this.subscriptionCommands = [];
+
 		this.wsReady = false;
 		this.ws.on('open', () => {
 
@@ -57,6 +59,10 @@ class EXCHANGE {
 					channel: this.symbol + '_trades'
 				}));
 			}
+
+			this.subscriptionCommands.map(cmd => {
+				this.ws.send(cmd);
+			});
 
 			this.wsReady = true;
 
@@ -109,10 +115,13 @@ class EXCHANGE {
 			BaseCurrency
 		};
 
-		this.ws.send(JSON.stringify({
+		let cmd = JSON.stringify({
 			event: 'addChannel',
 			channel: symbol + '_' + type
-		}));
+		});
+		this.ws.send(cmd);
+
+		this.subscriptionCommands.push(cmd);
 	}
 
 	onDepth(data) {

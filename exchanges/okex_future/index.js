@@ -6,7 +6,7 @@ const wait = require('delay');
 const fetch = require('node-fetch');
 const EXCHANGE = require('../exchange.js');
 
-class EX extends EXCHANGE {
+class OKEX_FUTURE extends EXCHANGE {
 	constructor(options) {
 		options = Object.assign({
 			Name: 'OKEX_FUTURE',
@@ -390,4 +390,4 @@ class EX extends EXCHANGE {
 }
 
 
-module.exports = EX;
+module.exports = OKEX_FUTURE;
