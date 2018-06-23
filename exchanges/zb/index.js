@@ -114,22 +114,21 @@ class ZB extends EXCHANGE {
 		return this.rest.GetTicker(currency);
 	}
 
-	Buy(price, amount, currency) {
+	Trade(type, price, amount, currency) {
 		if (this.options.Decimals) price = N(price).round(this.options.Decimals);
 		if (this.options.StockDecimals) amount = N(amount).floor(this.options.StockDecimals);
-		console.log(this.GetName(), 'Buy', price, amount, currency || '');
-		return this.getHandler().Buy(price, amount, currency).then(id => {
+		console.log(this.GetName(), type, price, amount, currency || '');
+		return this.getHandler()[type](price, amount, currency).then(id => {
 			return id;
 		});
 	}
 
-	Sell(price, amount, currency) {
-		if (this.options.Decimals) price = N(price).round(this.options.Decimals);
-		if (this.options.StockDecimals) amount = N(amount).floor(this.options.StockDecimals);
-		console.log(this.GetName(), 'Sell', price, amount, currency || '');
-		return this.getHandler().Sell(price, amount, currency).then(id => {
-			return id;
-		});
+	Buy(...args) {
+		return this.Trade('Buy', ...args);
+	}
+
+	Sell(...args) {
+		return this.Trade('Sell', ...args);
 	}
 
 	waitUntilWSReady() {
