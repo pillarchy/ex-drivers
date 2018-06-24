@@ -196,6 +196,14 @@ class EXCHANGE {
 			}
 		}
 		debugOrder('original order', JSON.stringify(o));
+
+		let Currency = this.options.Currency;
+		let BaseCurrency = this.options.BaseCurrency;
+		if (o.currency && /^\w+\_\w+$/.test(o.currency)) {
+			let arr = o.currency.split('_');
+			Currency = String(arr[0]).toUpperCase();
+			BaseCurrency = String(arr[1]).toUpperCase();
+		}
 		let re = {
 			Id: o.id,
 			Price: N.parse(o.price),
@@ -204,6 +212,8 @@ class EXCHANGE {
 			Type: (o.type && o.type * 1 === 1) ? 'Buy' : 'Sell',
 			Time: N.parse(o.trade_date),
 			Status: _order_status(o.status * 1),
+			Currency,
+			BaseCurrency,
 			Info: o
 		};
 

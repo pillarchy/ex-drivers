@@ -184,7 +184,7 @@ class ZB extends EXCHANGE {
 			t.AvgPrice = t.Price;
 			return t;
 		});
-		return trades.filter(o => o.DealAmount > 0);
+		return trades.filter(o => (o.Status === 'Closed' || o.Status === 'Cancelled') && o.DealAmount > 0);
 	}
 
 	GetOrder(orderId) {
