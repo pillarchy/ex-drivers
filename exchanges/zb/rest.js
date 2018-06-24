@@ -6,169 +6,151 @@ const crypto = require('crypto');
 const fetch = require('node-fetch');
 const debug = require('debug')('exchange:zb:rest');
 const debugOrder = require('debug')('order');
+const ExError = require('../../lib/error');
+const ErrorCode = require('../../lib/error-code');
 
-class EXCHANGE {
+class ZB_REST {
 	constructor(options) {
-		if (!options.Currency) options.Currency = 'BTC';
-		if (!options.BaseCurrency) options.BaseCurrency = 'USDT';
-
-		this.Currency = options.Currency;
-		this.BaseCurrency = options.BaseCurrency;
-
 		this.options = options;
-		this.requestLimit = 10;
-		this.requestLimitPeriod = 1000;
-
 		if (!this.options.rateLimiter) throw 'No rateLimiter in options';
-
 		this.history = [];
-
-		this.symbol = this.Currency.toLowerCase() + '_' + this.BaseCurrency.toLowerCase();
-	}
-
-	GetName() {
-		return this.options.Name ? this.options.Name : 'ZB';
+		this.symbol = (this.options.Currency + '_' + this.options.BaseCurrency).toLowerCase();
 	}
 
 	async request(_params, timeout = 5000) {
-
 		await this.options.rateLimiter.wait();	
+		let params = {};
+		params.accesskey = this.options.Key;
+		params.method = _params.method;
+		delete(_params.method);
+		for (let key in _params) params[key] = _params[key];
 
-		return new Promise(( done, reject) => {
-			let params = {};
-			params.accesskey = this.options.Key;
-			params.method = _params.method;
-			delete(_params.method);
-			for (let key in _params) params[key] = _params[key];
+		params.sign = sign(params, this.options.Secret);
+		params.reqTime = Date.now();
 
-			params.sign = sign(params, this.options.Secret);
-			params.reqTime = Date.now();
+		let vars = [];
+		for (let key in params) {
+			vars.push(key + '=' + encodeURIComponent(params[key]));
+		}
+		debug('<<<', params);
 
-			let vars = [];
-			for (let key in params) {
-				vars.push(key + '=' + encodeURIComponent(params[key]));
-			}
-			// debug('<<<', params);
-
-			fetch('https://trade.bitkk.com/api/' + params.method + '?' + vars.join('&'), {
-				method: 'GET',
-				timeout
-			}).then(r => r.json()).then(r => {
-				// debug('>>>', JSON.stringify(r, null, '\t'));
+		return fetch('https://trade.bitkk.com/api/' + params.method + '?' + vars.join('&'), {
+			method: 'GET',
+			timeout
+		}).then(async res => {
+			let raw = await res.text();
+			let status = res.status;
+			debug('>>>', status, raw);
+			try {
+				let r = JSON.parse(raw);
 				if (r.code && r.message && r.code * 1 !== 1000) throw r;
 				if (r && r.result) return r.result;
 				return r;
-			}).then(done).catch(err => {
-				reject(err);
-			});
+			} catch (err) {
+				if (err && err.code) throw err;
+				throw new ExError(ErrorCode.UNKNOWN_ERROR, raw, err);
+			}
+		}).catch(err => {
+			if (err.type === 'request-timeout') {
+				throw new ExError(ErrorCode.REQUEST_TIMEOUT, `rest request (${params.method}) timeout`, err);
+			}
+			throw err;
 		});
 	}
 
 	GetAccount() {
 		return this.request({
 			method: 'getAccountInfo'
-		}).catch(err => {
-			if (err.type === 'request-timeout') {
-				throw 'GetAccount timeout';
-			}
-			throw err;
+		}).then(data => {
+			data.route = 'rest';
+			return data;
 		});
 	}
 
-	GetTicker(currency) {
-		const symbol = this._getSymbol(currency);
-		return fetch('http://api.bitkk.com/data/v1/ticker?market=' + symbol).then(r => r.json()).then(data => {
-			if (!data.ticker) return;
-			let t = data.ticker;
-			return {
-				Buy: N.parse(t.buy),
-				Sell: N.parse(t.sell),
-				High: N.parse(t.high),
-				Last: N.parse(t.last),
-				Low: N.parse(t.low),
-				Volume: N.parse(t.vol)
-			};
+	async GetTicker(Currency, BaseCurrency) {
+		const symbol = this._getSymbol(Currency, BaseCurrency);
+		let res = await fetch('http://api.bitkk.com/data/v1/ticker?market=' + symbol, {
+			timeout: 5000
 		});
+		let status = res.status;
+		let text = await res.text();
+		if (status !== 200) throw new ExError(ErrorCode.BAD_RESPONSE_STATUS, 'zb GetTicker returns bad status: ' + status);
+
+		try {
+			let data = JSON.parse(text);
+			data.route = 'rest';
+			return data;
+		} catch (err) {
+			throw new ExError(ErrorCode.INVALID_JSON, 'bad json string: ' + text, err);
+		}
 	}
 
-	GetTrades(page = 1) {
+	GetTrades(page = 1, pageSize = 100, Currency, BaseCurrency) {
 		return this.request({
-			currency: this.symbol,
+			currency: this._getSymbol(Currency, BaseCurrency),
 			method: 'getOrdersIgnoreTradeType',
 			pageIndex: page,
-			pageSize: 100
-		}).then(arr => arr.map(o => this._transform_order(o))).catch(err => {
+			pageSize 
+		}).catch(err => {
+			if (err && err.code === 3001) return [];
 			if (err && err.type === 'request-timeout') throw `zb getTrades timed out`;
 			throw err;
 		});
 	}
 
-	_getSymbol(currency) {
-		return (!currency) ? this.symbol : currency.toLowerCase() + '_' + this.BaseCurrency.toLowerCase();
+	_getSymbol(Currency = '', BaseCurrency = '') {
+		let c = Currency || this.options.Currency;
+		let bc = BaseCurrency || this.options.BaseCurrency;
+		return c.toLowerCase() + '_' + bc.toLowerCase();
 	}
 
-	_trade(tradeType, price, amount, currency) {
+	Trade(type, price, amount, Currency, BaseCurrency) {
 		ok( amount > 0, 'amount should greater than 0');
-		const symbol = this._getSymbol(currency);
 		return this.request({
 			amount,
-			currency: symbol,
+			currency: this._getSymbol(Currency, BaseCurrency),
 			method: 'order',
 			price: price + '',
-			tradeType
+			tradeType: type === 'Sell' ? 0 : 1
 		}).then(o => {
 			if (o && o.id) return o.id;
 			throw new Error(JSON.stringify(o));
 		});
 	}
 
-	Buy(price, amount, currency) {
-		return this._trade(1, price, amount, currency);
-	}
-
-	Sell(price, amount, currency) {
-		return this._trade(0, price, amount, currency);
-	}
-
-	CancelOrder(orderId, currency) {
+	CancelOrder(orderId, Currency, BaseCurrency) {
 		return this.request({
 			method: `cancelOrder`,
-			currency: this._getSymbol(currency),
+			currency: this._getSymbol(Currency, BaseCurrency),
 			id: orderId
 		}).then(a => a && a.code * 1 === 1000);
 	}
 
-	async GetOrders(currency) {
+	async GetOrders(Currency, BaseCurrency) {
 		let re = [], orders = [], page = 0;
 		try {
 			do {
 				page++;
 				orders = await this.request({
-					currency: this._getSymbol(currency),
+					currency: this._getSymbol(Currency, BaseCurrency),
 					method: 'getUnfinishedOrdersIgnoreTradeType',
 					pageIndex: page,
 					pageSize: 10
-				}, 10000).then(orders => orders.map(this._transform_order));
+				}, 10000);
 				if (orders && orders.length > 0) re = re.concat(orders);
 			} while ( orders.length === 10 );
 			return re;
 		} catch (err) {
 			if (re && re.length > 0) return re;
-			// console.error(this.symbol, err);
-			if (err && err.code === 3001) return [];
-			// if (err && err.type === 'request-timeout') throw 'getUnfinishedOrdersIgnoreTradeType timeout';
 			throw err;
 		}
 	}
 
-	GetOrder(orderId) {
+	GetOrder(orderId, Currency, BaseCurrency) {
 		return this.request({
-			currency: this.symbol,
+			currency: this._getSymbol(Currency, BaseCurrency),
 			method: 'getOrder',
 			id: orderId
-		}).then(this._transform_order).catch(err => {
-			if (err && err.type === 'request-timeout') throw `getOrder(${orderId}) timed out`;
-			throw err;
 		});
 	}
 
@@ -222,13 +204,17 @@ class EXCHANGE {
 		return re;
 	}
 
-	GetDepth(size, merge) {
+	GetDepth(Currency, BaseCurrency, size, merge) {
 		if (!size) size = 30;
-		let url = `http://api.bitkk.com/data/v1/depth?size=${size}&market=${this.symbol}`;
+		if (!Currency) Currency = this.options.Currency;
+		if (!BaseCurrency) BaseCurrency = this.options.BaseCurrency;
+		let url = `http://api.bitkk.com/data/v1/depth?size=${size}&market=${this._getSymbol(Currency, BaseCurrency)}`;
 		if (merge) url += '&merge=' + merge;
 
 		debug('get depth url = ', url);
-		return fetch(url).then(r => r.json()).then(data => {
+		return fetch(url, {
+			timeout: 5000
+		}).then(r => r.json()).then(data => {
 			if (data && data.error) throw data.error;
 			debug('get depth returns:', data);
 			if (!data.asks || !data.bids) return;
@@ -247,13 +233,18 @@ class EXCHANGE {
 			});
 
 			let depth = {
-				Asks: R.sort( R.descend( R.prop('Price') ), asks).slice(-20),
-				Bids: R.sort( R.descend( R.prop('Price') ), bids).slice(0, 20)
+				Asks: R.sort( R.ascend( R.prop('Price') ), asks),
+				Bids: R.sort( R.descend( R.prop('Price') ), bids),
+				Currency,
+				BaseCurrency,
+				Time: data.timestamp * 1000
 			};
 
 			return depth;
 		}).catch(err => {
-			if (err && err.code === 'ETIMEDOUT') throw 'zb rest GetDepth timeout';
+			if (err && (err.code === 'ETIMEDOUT' || err.type === 'request-timeout')) {
+				throw ExError(ErrorCode.REQUEST_TIMEOUT, 'zb GetDepth timeout', err);
+			}
 			if (err && err.response && err.response.status === 502) throw 'zb rest GetDepth got 502';
 			throw err;
 		});
@@ -291,4 +282,4 @@ function hash_hmac(data, key) {
 	return hmac.digest('hex');
 }
 
-module.exports = EXCHANGE;
+module.exports = ZB_REST;

@@ -46,8 +46,24 @@ APIs:
 }
 ```
 
+`GetDepth()`  get depth data
 
-`GetTrades(page = 1)` get trade history
+```
+{
+	Asks: [ {
+			Price: float,
+			Amount: float
+		},
+		...
+	],
+	Bids: [
+		...
+	]
+}
+```
+
+
+`GetTrades(page = 1)` get finished trade history
 
 ```
 [
@@ -57,7 +73,7 @@ APIs:
 		Amount: float,
 		DealAmount: float,
 		AvgPrice: float,
-		Status: Pendding || Cancelled || Closed,
+		Status: Cancelled || Closed,
 		Info: {...original object from exchange api}
 	},
 	...
@@ -86,9 +102,9 @@ let zb = new ex({
 });
 
 //subscribe more data
-zb.SubscribeDepth('EOS', 'QC');
-zb.SubscribeTicker('EOS', 'QC');
-zb.SubscribePublicTrades('EOS', 'QC');
+zb.Subscribe('EOS', 'QC', 'Depth');
+zb.Subscribe('EOS', 'QC', 'Ticker');
+zb.Subscribe('EOS', 'QC', 'PublicTrades');
 ```
 
 
