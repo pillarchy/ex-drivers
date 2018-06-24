@@ -1,6 +1,6 @@
 {
   "name": "ex-drivers",
-  "version": "0.0.22",
+  "version": "0.0.24",
   "description": "crypto currency exchange drivers",
   "main": "index.js",
   "dependencies": {
@@ -12,6 +12,7 @@
     "got": "^8.3.1",
     "jsonic": "^0.3.0",
     "moment": "^2.22.1",
+    "nock": "^9.3.3",
     "node-bittrex-api": "^0.7.6",
     "node-fetch": "^2.1.2",
     "pako": "^1.0.6",

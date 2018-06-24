@@ -20,8 +20,6 @@ class BITFINEX extends EXCHANGE {
 		}, options);
 		super(options);
 
-		this.Currency = this.options.Currency;
-
 		this.rest = new EXCHANGE_REST(this.options);
 
 		if (this.options.isWS) {
@@ -89,7 +87,7 @@ class BITFINEX extends EXCHANGE {
 		let n = 0;
 		while ( true ) {
 			try {
-				let a = await this.rest.CancelAllOrders();
+				await this.rest.CancelAllOrders();
 				break;
 			} catch ( err ) {
 				await wait(n * 1000);

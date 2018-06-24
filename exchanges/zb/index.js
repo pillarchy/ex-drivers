@@ -24,9 +24,6 @@ class ZB extends EXCHANGE {
 			this.ws = new WS(this.options);
 		}
 
-		this.decimals = this.options.Decimals || 2;
-		this.stockDecimals = this.options.StockDecimals;
-
 		this.rest = new REST(this.options);
 	}
 
@@ -117,22 +114,21 @@ class ZB extends EXCHANGE {
 		return this.rest.GetTicker(currency);
 	}
 
-	Buy(price, amount, currency) {
-		price = N(price).round(this.decimals);
-		amount = N(amount).floor(this.stockDecimals);
-		console.log(this.GetName(), 'Buy', price, amount, currency || '');
-		return this.getHandler().Buy(price, amount, currency).then(id => {
+	Trade(type, price, amount, currency) {
+		if (this.options.Decimals) price = N(price).round(this.options.Decimals);
+		if (this.options.StockDecimals) amount = N(amount).floor(this.options.StockDecimals);
+		console.log(this.GetName(), type, price, amount, currency || '');
+		return this.getHandler()[type](price, amount, currency).then(id => {
 			return id;
 		});
 	}
 
-	Sell(price, amount, currency) {
-		price = N(price).round(this.decimals);
-		amount = N(amount).floor(this.stockDecimals);
-		console.log(this.GetName(), 'Sell', price, amount, currency || '');
-		return this.getHandler().Sell(price, amount, currency).then(id => {
-			return id;
-		});
+	Buy(...args) {
+		return this.Trade('Buy', ...args);
+	}
+
+	Sell(...args) {
+		return this.Trade('Sell', ...args);
 	}
 
 	waitUntilWSReady() {

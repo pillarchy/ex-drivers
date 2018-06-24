@@ -35,21 +35,6 @@ class EXCHANGE {
 		await this.options.rateLimiter.wait();	
 
 		return new Promise(( done, reject) => {
-
-			// let finished = false;
-			// let timer = setTimeout(() => {
-			// 	finished = true;
-			// 	reject('zb rest api timeout: '+JSON.stringify(_params));
-			// }, 10000);
-
-			// let finish = () => {
-			// 	if (finished) return;
-			// 	finished = true;
-			// 	try {
-			// 		clearTimeout(timer);
-			// 	} catch(err) {}
-			// };
-
 			let params = {};
 			params.accesskey = this.options.Key;
 			params.method = _params.method;
@@ -63,19 +48,17 @@ class EXCHANGE {
 			for (let key in params) {
 				vars.push(key + '=' + encodeURIComponent(params[key]));
 			}
-			debug('<<<', params);
+			// debug('<<<', params);
 
 			fetch('https://trade.bitkk.com/api/' + params.method + '?' + vars.join('&'), {
 				method: 'GET',
 				timeout
 			}).then(r => r.json()).then(r => {
-				// finish();
-				debug('>>>', r);
+				// debug('>>>', JSON.stringify(r, null, '\t'));
 				if (r.code && r.message && r.code * 1 !== 1000) throw r;
 				if (r && r.result) return r.result;
 				return r;
 			}).then(done).catch(err => {
-				// finish();
 				reject(err);
 			});
 		});
