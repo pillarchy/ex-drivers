@@ -6,23 +6,16 @@ const sha1 = require('sha1');
 const crypto = require('crypto');
 const delay = require('delay');
 const debug = require('debug')('exchange:zb:ws');
-const wait = require('delay');
+const Events = require('events');
+const ExError = require('../../lib/error');
+const ErrorCode = require('../../lib/error-code');
 
-class EXCHANGE {
+class ZB_WS extends Events {
 	constructor(options) {
-		if (!options.Currency) options.Currency = 'BTC';
-		if (!options.BaseCurrency) options.BaseCurrency = 'USDT';
-
-		this.Currency = options.Currency;
-		this.BaseCurrency = options.BaseCurrency;
-
+		super();
 		this.options = options;
 
-		if (!this.options.rateLimiter) throw 'No rateLimiter in options';
-
-		this.symbol = this.Currency.toLowerCase() + this.BaseCurrency.toLowerCase();
-		this.requestLimitPeriod = 1000;
-		this.requestLimit = 13;
+		this.symbol = this.options.Currency.toLowerCase() + this.options.BaseCurrency.toLowerCase();
 		this.history = [];
 
 		this.ws = new WebSocket('wss://api.bitkk.com:9999/websocket');
@@ -36,36 +29,34 @@ class EXCHANGE {
 		//remember subscription commands
 		this.subscriptionCommands = [];
 
+		if (this.options.onDepth) {
+			this.subscriptionCommands.push(JSON.stringify({
+				event: 'addChannel',
+				channel: this.symbol + '_depth'
+			}));
+		}
+
+		if (this.options.onTicker) {
+			this.subscriptionCommands.push(JSON.stringify({
+				event: 'addChannel',
+				channel: this.symbol + '_ticker'
+			}));
+		}
+
+		if (this.options.onPublicTrades) {
+			this.subscriptionCommands.push(JSON.stringify({
+				event: 'addChannel',
+				channel: this.symbol + '_trades'
+			}));
+		}
+
 		this.wsReady = false;
 		this.ws.on('open', () => {
-
-			if (this.options.onDepth) {
-				this.ws.send(JSON.stringify({
-					event: 'addChannel',
-					channel: this.symbol + '_depth'
-				}));
-			}
-
-			if (this.options.onTicker) {
-				this.ws.send(JSON.stringify({
-					event: 'addChannel',
-					channel: this.symbol + '_ticker'
-				}));
-			}
-
-			if (this.options.onPublicTrades) {
-				this.ws.send(JSON.stringify({
-					event: 'addChannel',
-					channel: this.symbol + '_trades'
-				}));
-			}
-
 			this.subscriptionCommands.map(cmd => {
 				this.ws.send(cmd);
 			});
-
 			this.wsReady = true;
-
+			this.emit('connect');
 		});
 
 		this.ws.on('message', (data) => {
@@ -79,6 +70,10 @@ class EXCHANGE {
 			if (this.options.onPong) {
 				this.options.onPong(t);
 			}
+		});
+
+		this.ws.on('close', () => {
+			this.emit('close');
 		});
 
 		this.tmpHandlers = {};
@@ -114,13 +109,11 @@ class EXCHANGE {
 			Currency,
 			BaseCurrency
 		};
-
 		let cmd = JSON.stringify({
 			event: 'addChannel',
-			channel: symbol + '_' + type
+			channel: String(symbol + '_' + type).toLowerCase()
 		});
 		this.ws.send(cmd);
-
 		this.subscriptionCommands.push(cmd);
 	}
 
@@ -223,18 +216,16 @@ class EXCHANGE {
 		this.options.onPublicTrades(trades);
 	}
 
-	GetName() {
-		return this.options.Name ? this.options.Name : 'ZB';
-	}
-
 	handleOnce(data) {
 		if (data && data.channel && data.no) {
 			let key = data.channel + ',' + data.no;
 			if (this.tmpHandlers[key]) {
 				this.tmpHandlers[key](data);
 				delete(this.tmpHandlers[key]);
+				return true;
 			}
 		}
+		return false;
 	}
 
 	once(channel, no) {
@@ -242,7 +233,9 @@ class EXCHANGE {
 			let expired = false;
 			let timer = setTimeout(() => {
 				expired = true;
-				reject('zb websocket api for ' + channel + ' expired');
+				let err = new ExError(ErrorCode.REQUEST_TIMEOUT, 'zb websocket api for ' + channel + ' expired');
+				err.type = 'request-timeout';
+				reject(err);
 			}, 5000);
 			let key = channel + ',' + no;
 			this.tmpHandlers[key] = (data) => {
@@ -254,10 +247,7 @@ class EXCHANGE {
 	}
 
 	async request(params) {
-
 		await this.options.rateLimiter.wait();
-
-		let re = null;
 		let no = Date.now() + '' + Math.random().toString().replace(/\./g, '');
 		let channel = params.channel;
 		if (!channel) throw new Error("no channel");
@@ -287,37 +277,30 @@ class EXCHANGE {
 	GetAccount() {
 		return this.request({
 			channel: 'getaccountinfo'
+		}).then(data => {
+			data.route = 'websocket';
+			return data;
 		});
 	}
 
-	GetMin() {
-		return 0.01;
+	_getSymbol(Currency, BaseCurrency) {
+		let c = Currency || this.options.Currency;
+		let bc = BaseCurrency || this.options.BaseCurrency;
+		return c.toLowerCase() + bc.toLowerCase();
 	}
 
-	_getSymbol(currency) {
-		return (!currency) ? this.symbol : currency.toLowerCase() + this.BaseCurrency.toLowerCase();
-	}
-
-	_trade(tradeType, price, amount, currency) {
+	Trade(type, price, amount, Currency, BaseCurrency) {
 		ok( amount > 0, 'amount should greater than 0');
 
 		return this.request({
 			amount,
-			channel: `${this._getSymbol(currency)}_order`,
+			channel: `${this._getSymbol(Currency, BaseCurrency)}_order`,
 			price,
-			tradeType
+			tradeType: type === 'Sell' ? 0 : 1
 		}).then(o => {
 			if (o && o.entrustId) return o.entrustId;
 			throw o;
 		});
-	}
-
-	Buy(price, amount, currency) {
-		return this._trade(1, price, amount, currency);	
-	}
-
-	Sell(price, amount, currency) {
-		return this._trade(0, price, amount, currency);
 	}
 
 	async waitUntilWSReady() {
@@ -330,100 +313,19 @@ class EXCHANGE {
 		return true;
 	}
 
-	CancelOrder(orderId) {
+	CancelOrder(orderId, Currency, BaseCurrency) {
 		return this.request({
-			channel: `${this.symbol}_cancelorder`,
+			channel: `${this._getSymbol(Currency, BaseCurrency)}_cancelorder`,
 			id: orderId
 		}).then(a => a && a.success);
 	}
 
-	async CancelPendingOrders() {
-		let n = 0;
-		while ( true ) {
-			try {
-				let a = await this.rest.CancelAllOrders();
-				break;
-			} catch ( err ) {
-				await wait(n * 1000);
-			}
-			n++;
-			if (n > 20) {
-				throw new Error('zb can not cancel all orders');
-			}
-		}
-		return true;
-	}
-
-	GetOrders(page) {
+	GetOrder(orderId, Currency, BaseCurrency) {
 		return this.request({
-			channel: `${this.symbol}_getordersignoretradetype`,
-			pageIndex: page || 1,
-			pageSize: 100
-		}).then(re => {
-			// console.log(re);
-			if (!re || re.success === false) {
-				throw JSON.stringify(re);
-			}
-			return re;
-		}).then(orders => orders.map(this._transform_order)).then(arr => {
-			return arr.filter(o => (o.Status === 'Pending' || o.Status === 'Partial'));
+			channel: `${this._getSymbol(Currency, BaseCurrency)}_getorder`,
+			id: orderId
 		});
 	}
-
-	GetOrder(orderId) {
-		/*
-		{"id":4086524332,"cid":33269813689,"cid_date":"2017-10-01","gid":null,"symbol":"ethusd","exchange":"bitfinex","price":"330.0","avg_execution_price":"300.04","side":"buy","type":"exchange limit","timestamp":"1506849270.0","is_live":false,"is_cancelled":false,"is_hidden":false,"oco_order":null,"was_forced":false,"original_amount":"0.05","remaining_amount":"0.0","executed_amount":"0.05","src":"api"}
-		 */
-		return this.request({
-			channel: `${this.symbol}_getorder`,
-			id: orderId
-		}).then(this._transform_order);
-	}
-
-	_transform_order(o) {
-		/*
-		{ currency: 'btcusdt',
-		    id: '201712127040792',
-		    price: '13000.0',
-		    status: '0',
-		    total_amount: '0.01',
-		    trade_amount: '0.0',
-		    trade_date: '1513063121871',
-		    trade_money: '0.000000',
-		    trade_price: '0',
-		    type: '1' },
-		 */
-		function _order_status(o) {
-			//(0：待成交,1：取消,2：交易完成,3：待成交未交易部份)
-			switch (o) {
-					case 0: return 'Pending';
-					case 1: return 'Cancelled';
-					case 2: return 'Closed';
-					case 3: return 'Partial';
-					default: return 'Unknown';
-			}
-		}
-
-		let re = {
-			Id: o.id,
-			Price: N.parse(o.price),
-			Amount: N.parse(o.total_amount),
-			DealAmount: N.parse(o.trade_amount),
-			Type: (o.type && o.type * 1 === 1) ? 'Buy' : 'Sell',
-			Time: N.parse(o.trade_date),
-			Status: _order_status(o.status * 1)
-		};
-
-		if (re.DealAmount === 0 && re.Status === 'Partial') re.Status = 'Pending';
-
-		return re;
-	}
-
-	GetDepth(size, merge) {
-		return this.rest.GetDepth(size, merge);
-	}
-
-	
 
 	_order_type( type ) {
 		//buy_market:市价买入 / sell_market:市价卖出
@@ -453,4 +355,5 @@ function hash_hmac(data, key) {
 	hmac.update(data);
 	return hmac.digest('hex');
 }
-module.exports = EXCHANGE;
+
+module.exports = ZB_WS;

@@ -71,3 +71,6 @@ nock('https://trade.bitkk.com').persist().get(/\/api\/getAccountInfo/).reply(200
 		id: Date.now()
 	}
 });
+
+
+nock('http://api.bitkk.com').persist().get(/data\/v1\/ticker/).reply(200, "aaa");

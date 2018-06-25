@@ -15,11 +15,13 @@ class EXCHANGE {
 
 		options = Object.assign({
 			RateLimit: 10,
-			RateLimitInterval: 1000
+			RateLimitInterval: 1000,
+			WSTimeout: 10000,
+			ThrowWhenRateLimited: false
 		}, options);
 
 		if (!options.rateLimiter && options.RateLimit && options.RateLimitInterval) {
-			options.rateLimiter = new RateLimiter(options.RateLimitInterval, options.RateLimit);
+			options.rateLimiter = new RateLimiter(options.RateLimitInterval, options.RateLimit, options.ThrowWhenRateLimited);
 		}
 
 		this.options = options;
@@ -34,7 +36,7 @@ class EXCHANGE {
 		let startTime = Date.now();
 		while (!this.wsReady) {
 			await wait(200);
-			if (Date.now() - startTime > 30000) {
+			if (Date.now() - startTime > this.options.WSTimeout) {
 				throw new Error(this.GetName() + ' websocket timeout');
 			}
 		}

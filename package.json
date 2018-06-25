@@ -1,9 +1,10 @@
 {
   "name": "ex-drivers",
-  "version": "0.0.24",
+  "version": "0.0.26",
   "description": "crypto currency exchange drivers",
   "main": "index.js",
   "dependencies": {
+    "better-assert": "^1.0.2",
     "bitfinex-api-node": "^1.2.0",
     "chai": "^4.1.2",
     "clor": "^5.2.0",
