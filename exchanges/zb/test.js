@@ -12,7 +12,7 @@ let ex = new ZB({
 	BaseCurrency: 'QC',
 	Key: config.zb.key,
 	Secret: config.zb.secret,
-	isWS: true 
+	isWS: false 
 });
 
 let ids = {}, stocks = 0, balance = 0, lastPrice = 0;
@@ -39,23 +39,23 @@ describe('test zb', function() {
 		assert(t.BaseCurrency === 'USDT');
 	});
 
-	it('should get depth', async () => {
-		let t = await ex.GetDepth();
-		debug(t);
-		assert(t);
-		assert(t.Asks && t.Bids);
-		assert(t.Asks.length > 0 && t.Bids.length > 0);
-		assert(t.Asks[0].Price > 0 && t.Asks[0].Amount > 0);
-		assert(t.Bids[0].Price > 0 && t.Bids[0].Amount > 0);
-		assert(t.Currency === 'USDT');
-		assert(t.BaseCurrency === 'QC');
+	// it('should get depth', async () => {
+	// 	let t = await ex.GetDepth();
+	// 	debug(t);
+	// 	assert(t);
+	// 	assert(t.Asks && t.Bids);
+	// 	assert(t.Asks.length > 0 && t.Bids.length > 0);
+	// 	assert(t.Asks[0].Price > 0 && t.Asks[0].Amount > 0);
+	// 	assert(t.Bids[0].Price > 0 && t.Bids[0].Amount > 0);
+	// 	assert(t.Currency === 'USDT');
+	// 	assert(t.BaseCurrency === 'QC');
 
-		t = await ex.GetDepth('EOS', 'USDT');
-		debug(t);
-		assert(t.Asks && t.Bids);
-		assert(t.Currency === 'EOS');
-		assert(t.BaseCurrency === 'USDT');
-	});
+	// 	t = await ex.GetDepth('EOS', 'USDT');
+	// 	debug(t);
+	// 	assert(t.Asks && t.Bids);
+	// 	assert(t.Currency === 'EOS');
+	// 	assert(t.BaseCurrency === 'USDT');
+	// });
 
 	it('should get account', async () => {
 		let t = await ex.GetAccount();
@@ -174,44 +174,44 @@ describe('test zb', function() {
 
 	
 
-	it('should get trades', async () => {
-		let t = 0;
-		while ( t < 10 ) {
-			try {
-				let arr = await ex.GetTrades(1, 100, 'BTC', 'QC');
-				arr = arr.filter(o => {
-					return !ids[o.Id];
-				});
+	// it('should get trades', async () => {
+	// 	let t = 0;
+	// 	while ( t < 10 ) {
+	// 		try {
+	// 			let arr = await ex.GetTrades(1, 100, 'BTC', 'QC');
+	// 			arr = arr.filter(o => {
+	// 				return !ids[o.Id];
+	// 			});
 
-				arr = arr.map(o => {
-					ids[o.Id] = true;
-					delete o.Info;
-					o.Time = moment(o.Time).format('YYYY-MM-DD HH:mm:ss:SSS');
-					return o;
-				});
+	// 			arr = arr.map(o => {
+	// 				ids[o.Id] = true;
+	// 				delete o.Info;
+	// 				o.Time = moment(o.Time).format('YYYY-MM-DD HH:mm:ss:SSS');
+	// 				return o;
+	// 			});
 
-				arr.map(o => {
-					if (o.Type === 'Buy') {
-						balance -= o.DealAmount * o.AvgPrice;
-						stocks += o.DealAmount;
-					} else {
-						balance += o.DealAmount * o.AvgPrice;
-						stocks -= o.DealAmount;
-					}
-					lastPrice = o.AvgPrice;
-				});
+	// 			arr.map(o => {
+	// 				if (o.Type === 'Buy') {
+	// 					balance -= o.DealAmount * o.AvgPrice;
+	// 					stocks += o.DealAmount;
+	// 				} else {
+	// 					balance += o.DealAmount * o.AvgPrice;
+	// 					stocks -= o.DealAmount;
+	// 				}
+	// 				lastPrice = o.AvgPrice;
+	// 			});
 
-				console.log(arr);
+	// 			console.log(arr);
 
-				let value = stocks * lastPrice + balance;
-				console.log(`stocks = ${stocks} balance = ${balance} value = ${value}`);
-			} catch (err) {
-				console.error(err);
-			}
-			await wait(1000);
-			t++;
-		}
-	});
+	// 			let value = stocks * lastPrice + balance;
+	// 			console.log(`stocks = ${stocks} balance = ${balance} value = ${value}`);
+	// 		} catch (err) {
+	// 			console.error(err);
+	// 		}
+	// 		await wait(1000);
+	// 		t++;
+	// 	}
+	// });
 
 
 });

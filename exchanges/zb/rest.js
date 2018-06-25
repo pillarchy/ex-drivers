@@ -9,6 +9,8 @@ const debugOrder = require('debug')('order');
 const ExError = require('../../lib/error');
 const ErrorCode = require('../../lib/error-code');
 
+const agent = require('../../lib/agent');
+
 class ZB_REST {
 	constructor(options) {
 		this.options = options;
@@ -36,7 +38,8 @@ class ZB_REST {
 
 		return fetch('https://trade.bitkk.com/api/' + params.method + '?' + vars.join('&'), {
 			method: 'GET',
-			timeout
+			timeout,
+			agent: agent.https
 		}).then(async res => {
 			let raw = await res.text();
 			let status = res.status;
@@ -70,7 +73,8 @@ class ZB_REST {
 	async GetTicker(Currency, BaseCurrency) {
 		const symbol = this._getSymbol(Currency, BaseCurrency);
 		let res = await fetch('http://api.bitkk.com/data/v1/ticker?market=' + symbol, {
-			timeout: 5000
+			timeout: 5000,
+			agent: agent.http
 		});
 		let status = res.status;
 		let text = await res.text();
@@ -213,7 +217,8 @@ class ZB_REST {
 
 		debug('get depth url = ', url);
 		return fetch(url, {
-			timeout: 5000
+			timeout: 5000,
+			agent: agent.http
 		}).then(r => r.json()).then(data => {
 			if (data && data.error) throw data.error;
 			debug('get depth returns:', data);
