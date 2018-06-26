@@ -73,6 +73,13 @@ class EXCHANGE {
 	GetMin() {
 		return this.options.MinTradeAmount || 0.01;
 	}
+
+	async GetAccountsMap(...args) {
+		return (await this.GetAccounts(...args)).reduce((map, a) => {
+			map[a.Currency] = a;
+			return map;
+		}, {});
+	}
 }
 
 

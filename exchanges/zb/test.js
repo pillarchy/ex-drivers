@@ -178,7 +178,7 @@ describe('test zb', function() {
 	// 	let t = 0;
 	// 	while ( t < 10 ) {
 	// 		try {
-	// 			let arr = await ex.GetTrades(1, 100, 'BTC', 'QC');
+	// 			let arr = await ex.GetTrades('BTC', 'QC');
 	// 			arr = arr.filter(o => {
 	// 				return !ids[o.Id];
 	// 			});

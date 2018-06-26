@@ -9,9 +9,13 @@ const N = require('precise-number');
 const R = require('ramda');
 const crypto = require('crypto');
 const moment = require('moment');
-const debug = require('debug')('hbpro:rest');
+const debug = require('debug')('huobi:rest');
+const ExError = require('../../lib/error');
+const ErrorCode = require('../../lib/error-code');
 
-class Huobi {
+const agent = require('../../lib/agent');
+
+class HUOBI_REST {
 
 	constructor(options) {
 		this.key = options.Key;
@@ -23,6 +27,12 @@ class Huobi {
 		this.accountId = null;
 
 		if (!this.options.rateLimiter) throw 'No rateLimiter in options';
+	}
+
+	_getSymbol(Currency, BaseCurrency) {
+		let c = Currency || this.options.Currency;
+		let bc = BaseCurrency || this.options.BaseCurrency;
+		return String(c + bc).toLowerCase();
 	}
 
 	async fetch(httpMethod, method, params, body) {
@@ -47,7 +57,7 @@ class Huobi {
 		sortedParams += '&Signature=' + encodeURIComponent(hash);
 
 		let url = 'https://' + this.options.domain + method + '?' + sortedParams;
-		// console.info('<<',httpMethod, url, JSON.stringify(body || 'nobody'));
+		debug('<<<', httpMethod, url, JSON.stringify(body || 'nobody'));
 		return fetch(url, {
 			method: httpMethod,
 			timeout: httpMethod === 'GET' ? 5000 : 10000,
@@ -55,18 +65,28 @@ class Huobi {
 			headers: {
 				'Content-Type': 'application/json',
 				'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.71 Safari/537.36'
-			}
-		}).then(res => res.text()).then(s => {
-			// console.info('>>',s);
+			},
+			agent: agent.https
+		}).then(async res => {
+			let s = await res.text();
+			let status = res.status;
+
+			if (status !== 200) throw new ExError(ErrorCode.BAD_RESPONSE_STATUS, `Huobi response bad status(${status})`, s);
+
+			debug('>>>', s);
 			let data = null;
 			try {
 				data = JSON.parse(s);
 			} catch (err) {
-				console.error('HuobiProRest can not parse json:' + s);
-				throw err;
+				throw new ExError(ErrorCode.INVALID_JSON, 'HuobiProRest can not parse json', err);
 			}
 
 			if (data && data.status === 'error') {
+
+				if (['order-accountbalance-error', 'account-transfer-balance-insufficient-error', 'account-frozen-balance-insufficient-error'].indexOf(data['err-code']) > -1) {
+					throw new ExError(ErrorCode.INSUFFICIENT_BALANCE, data['err-msg'], data);
+				}
+
 				let err = new Error(data['err-msg'] || data['err-code'] || JSON.stringify(data));
 				err.code = data['err-code'];
 				err.url = url;
@@ -78,11 +98,16 @@ class Huobi {
 				 */
 			}
 
-			if (!data || data.status != 'ok') {
+			if (!data || data.status !== 'ok') {
 				this.error('api response error:', data);
 			} else {
 				return data;
 			}
+		}).catch(err => {
+			if (err.type === 'request-timeout') {
+				throw new ExError(ErrorCode.REQUEST_TIMEOUT, `huobi rest request (${params.method}) timeout`, err);
+			}
+			throw err;
 		});
 	}
 
@@ -128,45 +153,73 @@ class Huobi {
 		});
 	}
 
-	GetTicker() {
+	GetTicker(Currency, BaseCurrency) {
 		return this.get('/market/detail/merged', {
-			symbol: this.symbol
+			symbol: this._getSymbol(Currency, BaseCurrency)
 		}).then(data => {
-			/**
-			 { amount: 7251.1279793922995, 成交量
-				open: 13667.79, 开盘价
-				close: 14850, 收盘价
-				high: 15327.15, 最高价
-				id: 809183597, k线id
-				count: 94966, 成交笔数
-				low: 13016.1, 最低价
-				version: 809183597,
-				ask: [ 14850, 0.6627 ],
-				vol: 102287654.87463513, 成交额
-				bid: [ 14849.82, 0.0045 ] }
-			 */
 			let t = data.tick;
-			if (!t) this.error('ticker response error:', data);
-			return t;
+			if (!t || !t.ask || !t.bid) this.error('ticker response error:', data);
+			
+			return {
+				High: N.parse(t.high),
+				Low: N.parse(t.low),
+				Buy: N.parse(t.bid[0]),
+				Sell: N.parse(t.ask[0]),
+				Last: N(t.bid[0]).add(t.ask[0]).div(2) * 1,
+				Volume: N.parse(t.vol),
+				Time: N.parse(data.ts),
+				...this._parse_ch(data.ch, Currency, BaseCurrency),
+				Info: data
+			};
 		});
 	}
 
-	GetDepth(type) {
+	_parse_ch(ch, Currency, BaseCurrency) {
+		if (!Currency) Currency = this.options.Currency;
+		if (!BaseCurrency) BaseCurrency = this.options.BaseCurrency;
+
+		let ms = (ch || '').match(/\b([^\.]+?)(usdt|btc|eth|ht|eos)\b/);
+		if (ms && ms[1]) Currency = String(ms[1]).toUpperCase();
+		if (ms && ms[2]) BaseCurrency = String(ms[2]).toUpperCase();
+		return { Currency, BaseCurrency };
+	}
+
+	GetDepth(Currency, BaseCurrency, type = 'step0') {
 		type = R.defaultTo('step0', type);
 		return this.get('/market/depth', {
-			symbol: this.symbol,
+			symbol: this._getSymbol(Currency, BaseCurrency),
 			type
 		}).then(data => {
 			let tick = data.tick;
 			if (!tick) this.error('got depth with no tick', data);
 			if (!tick.bids || !tick.asks) this.error('got broken depth data', data);
-			return tick;
+
+			tick.bids = tick.bids.map(b => {
+				return {
+					Price: N.parse(b[0]),
+					Amount: N.parse(b[1])
+				};
+			});
+
+			tick.asks = tick.asks.map(a => {
+				return {
+					Price: N.parse(a[0]),
+					Amount: N.parse(a[1])
+				};
+			});
+
+			return {
+				Asks: R.sort( R.ascend( R.prop('Price') ), tick.asks),
+				Bids: R.sort( R.descend( R.prop('Price') ), tick.bids),
+				Time: N.parse(data.ts),
+				...this._parse_ch(data.ch, Currency, BaseCurrency)
+			};
 		});
 	}
 
-	GetTrades() {
+	GetTrades(Currency, BaseCurrency) {
 		return this.get('/market/trade', {
-			symbol: this.symbol
+			symbol: this._getSymbol(Currency, BaseCurrency)
 		}).then(data => {
 			let trades = R.path(['tick', 'data'], data);
 			if (!trades) this.error('got broken trades data:', data);
@@ -183,7 +236,10 @@ class Huobi {
 		});
 	}
 
-	async GetAccount(type = 'spot') {
+	async GetAccount(Currency, BaseCurrency, type = 'spot') {
+		if (!Currency) Currency = this.options.Currency;
+		if (!BaseCurrency) BaseCurrency = this.options.BaseCurrency;
+
 		let accountId = await this._get_account_id(type);
 
 		let path = `/v1/account/accounts/${accountId}/balance`;
@@ -201,14 +257,37 @@ class Huobi {
 				info[ `${a.currency.toUpperCase()}_${a.type}` ] = N.parse(a.balance);
 			});
 			return {
-				Balance: info[`${this.BaseCurrency}_trade`],
-				FrozenBalance: info[`${this.BaseCurrency}_frozen`],
-				Stocks: info[`${this.Currency}_trade`],
-				FrozenStocks: info[`${this.Currency}_frozen`],
-				Info: info
+				Balance: info[`${BaseCurrency}_trade`],
+				FrozenBalance: info[`${BaseCurrency}_frozen`],
+				Stocks: info[`${Currency}_trade`],
+				FrozenStocks: info[`${Currency}_frozen`],
+				Currency,
+				BaseCurrency,
+				Info: data
 			};
 		} else {
 			throw new Error('no list info for account ' + accountId);
+		}
+	}
+
+	async GetAccounts(type = 'spot') {
+		let a = await this.GetAccount('', '', type);
+		if (a && a.Info && a.Info.data && a.Info.data.list) {
+			let cache = {}, re = [];
+			a.Info.data.list.map(c => {
+				cache[c.currency + '_' + c.type] = N.parse(c.balance);
+			});
+			a.Info.data.list.map(c => {
+				let Currency = String(c.currency).toUpperCase();
+				if (cache[Currency]) return;
+				cache[Currency] = 1;
+				re.push({
+					Currency,
+					Free: cache[c.currency + '_' + 'trade'],
+					Frozen: cache[c.currency + '_' + 'frozen']
+				});
+			});
+			return re;
 		}
 	}
 
@@ -219,9 +298,9 @@ class Huobi {
 		});
 	}
 
-	GetOrders() {
+	GetOrders(Currency, BaseCurrency) {
 		return this.get('/v1/order/orders', {
-			symbol: this.symbol,
+			symbol: this._getSymbol(Currency, BaseCurrency),
 			states: 'pre-submitted,submitted,partial-filled,partial-canceled'
 		}).then(r => {
 			if (!r.data) this.error('can not get orders:', r);
@@ -229,11 +308,24 @@ class Huobi {
 		});
 	}
 
+	GetTrades(Currency, BaseCurrency) {
+		return this.get('/v1/order/orders', {
+			symbol: this._getSymbol(Currency, BaseCurrency),
+			states: 'partial-canceled,filled,canceled',
+			size: 100
+		}).then(r => {
+			if (!r.data) this.error('can not get trades:', r);
+			return r.data;
+		});
+	}
+
 	CancelOrder(orderId) {
 		return this.post('/v1/order/orders/' + orderId + '/submitcancel').then(r => {
+			console.log(r);
 			if (!r.data) this.error('can not cancel order:', orderId, r);
 			return true;
 		}).catch(err => {
+			console.error(err);
 			if (err && err.code === 'order-orderstate-error') {
 				console.log('cancel a cancelled order');
 				return true;
@@ -258,20 +350,23 @@ class Huobi {
 		});
 	}
 
-	_create_order(type, price, amount) {
+	_create_order(type, price, amount, Currency, BaseCurrency) {
 		return this._get_account_id().then(accountId => {
 			let params = {
 				"account-id": accountId + '',
 				amount: amount + '',
 				price: price + '',
 				source: "api",
-				symbol: this.symbol,
+				symbol: this._getSymbol(Currency, BaseCurrency),
 				type
 			};
-			console.log(this.options.hadax ? 'HADAX' : 'HUOBIPRO', type, price, amount);
+
+			console.log(this.options.hadax ? 'HADAX' : 'HUOBIPRO', type, price, amount, Currency, BaseCurrency);
+
 			if (type === 'buy-market' || type === 'sell-market') {
 				delete(params.price);
 			}
+
 			let path = this.options.hadax ? '/v1/hadax/order/orders/place' : '/v1/order/orders/place';
 			return this.post(path, params).then(r => {
 				if (!r || r.status !== 'ok' || !r.data) this.error('can not create order:', amount, price, type, r);
@@ -280,21 +375,10 @@ class Huobi {
 		});
 	}
 
-	Trade(type, price, amount) {
-		return this._create_order(type, price, amount);
-	}
-
-	Buy(price, amount) {
-		let type = 'buy-limit';
-		if (price === -1) type = 'buy-market';
-		return this.Trade(type, price, amount);
-	}
-
-	Sell(price, amount) {
-		if (amount <= 0) this.error('amount should not be zero');
-		let type = 'sell-limit';
-		if (price === -1) type = 'sell-market';
-		return this.Trade(type, price, amount);
+	Trade(type, price, amount, Currency, BaseCurrency) {
+		let __type = price === -1 ? 'market' : 'limit';
+		let _type = `${type}-${__type}`.toLowerCase();
+		return this._create_order(_type, price, amount, Currency, BaseCurrency);
 	}
 
 	GetRecords(minutes) {
@@ -311,8 +395,11 @@ class Huobi {
 		if (!period) return Promise.reject(new Error('unsupported huobi kline period: ' + minutes + ' minutes'));
 
 		let url = 'https://api.huobi.pro?symbol=' + this.symbol + '&period=' + period + '&size=300';
-		return fetch(url).then(res => res.json());
+		return fetch(url, {
+			agent: agent.https,
+			timeout: 10000
+		}).then(res => res.json());
 	}
 }
 
-module.exports = Huobi;
+module.exports = HUOBI_REST;
