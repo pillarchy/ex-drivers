@@ -321,7 +321,7 @@ class HUOBI_REST {
 
 	CancelOrder(orderId) {
 		return this.post('/v1/order/orders/' + orderId + '/submitcancel').then(r => {
-			console.log(r);
+			// console.log(r);
 			if (!r.data) this.error('can not cancel order:', orderId, r);
 			return true;
 		}).catch(err => {
@@ -361,7 +361,7 @@ class HUOBI_REST {
 				type
 			};
 
-			console.log(this.options.hadax ? 'HADAX' : 'HUOBIPRO', type, price, amount, Currency, BaseCurrency);
+			console.log(this.options.hadax ? 'HADAX' : 'HUOBIPRO', type, price, amount, Currency || this.options.Currency, BaseCurrency || this.options.BaseCurrency);
 
 			if (type === 'buy-market' || type === 'sell-market') {
 				delete(params.price);
