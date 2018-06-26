@@ -37,7 +37,7 @@ class EXCHANGE {
 		while (!this.wsReady) {
 			await wait(200);
 			if (Date.now() - startTime > this.options.WSTimeout) {
-				throw new Error(this.GetName() + ' websocket timeout');
+				throw new Error(this.GetName() + ' websocket connection timeout');
 			}
 		}
 		return true;

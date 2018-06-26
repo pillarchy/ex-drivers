@@ -184,8 +184,8 @@ class HUOBI_REST {
 		return { Currency, BaseCurrency };
 	}
 
-	GetDepth(Currency, BaseCurrency, type = 'step0') {
-		type = R.defaultTo('step0', type);
+	GetDepth(Currency, BaseCurrency, type) {
+		type = R.defaultTo(this.options.DefaultDepthStep, type);
 		return this.get('/market/depth', {
 			symbol: this._getSymbol(Currency, BaseCurrency),
 			type

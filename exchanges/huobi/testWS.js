@@ -1,35 +1,25 @@
-const path = require('path');
+const ExDrivers = require('../../index.js');
+const config = require('../../accounts.config.json');
 
-global.chai = require('chai');
-global.expect = chai.expect;
-
-const assert = require('assert');
-
-let config = require('../../accounts.config.json');
-const N = require('precise-number');
-const wait = require('delay');
-
-const EX = require('./index.js');
-const Exchange = new EX({
-	Key: config.huobipro.key,
-	Secret: config.huobipro.secret,
+let HUOBI = new ExDrivers.HUOBI({
+	Currency: 'BTC',
+	BaseCurrency: 'USDT',
+	Key: config.huobi.key,
+	Secret: config.huobi.secret,
 	isWS: true,
-	onDepth: (depth) => {
-		console.log(depth);
+	onDepth(data) {
+		console.log('onDepth', data.Currency, data.BaseCurrency, data.Asks.length, data.Bids.length, data.Asks[0], data.Bids[0]);
 	},
-	onPong: (ms) => {
-		console.log('delay', ms);
+	onTicker(data) {
+		console.log('onTicker', data.Currency, data.BaseCurrency, data.Buy, data.Sell, data.Time);
 	},
-	Currency: 'EOS',
-	BaseCurrency: 'ETH'
+	onPublicTrades(data) {
+		console.log('onPublicTrades', data);
+	}
 });
 
-const log = console.log.bind(console);
+//subscribe more data
+HUOBI.Subscribe('EOS', 'USDT', 'Depth');
+HUOBI.Subscribe('EOS', 'USDT', 'Ticker');
+HUOBI.Subscribe('EOS', 'USDT', 'PublicTrades');
 
-describe('test huobipro websocket', function() {
-
-	this.timeout(100000000);
-
-	it('should wait a long time', () => wait(100000000));
-
-});

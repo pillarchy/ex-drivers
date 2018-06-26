@@ -18,25 +18,27 @@ class HUOBI extends EXCHANGE {
 			RateLimit: 10,
 			Decimals: 2,
 			MinTradeStocks: 0.001,
+			DefaultDepthStep: 'step0',
 			StockDecimals: 4
 		}, options);
 		options.domain = options.hadax ? 'api.hadax.com' : 'api.huobipro.com';
 		super(options);
 
-		this.isWS = options.isWS;
-		if (this.isWS) {
+		if (this.options.isWS) {
 			this.ws = new WS(this.options);
+			this.ws.on('connect', () => {
+				this.wsReady = true;
+			});
+			this.ws.on('close', () => {
+				this.wsReady = false;
+			});
 		}
+
 		this.rest = new REST(this.options);
 	}
 
-	waitUntilWSReady() {
-		if (!this.isWS) return true;
-		return this.ws.waitUntilWSReady();
-	}
-
 	getHandler() {
-		return this.isWS ? this.ws : this.rest;
+		return this.options.isWS ? this.ws : this.rest;
 	}
 
 	GetAccount(...args) {
@@ -45,6 +47,25 @@ class HUOBI extends EXCHANGE {
 
 	GetAccounts(...args) {
 		return this.rest.GetAccounts(...args);
+	}
+
+	async Subscribe(currency, baseCurrency, type) {
+		if (!this.options.isWS) throw new Error('is not websocket mode');
+		if (['Depth', 'PublicTrades', 'Ticker'].indexOf(type) === -1) {
+			throw new Error('unkown subscription type: ' + type);
+		}
+
+		if (type === 'Depth' && !this.options.onDepth) throw new Error('no onDepth callback');
+		if (type === 'Ticker' && !this.options.onTicker) throw new Error('no onTicker callback');
+		if (type === 'PublicTrades' && !this.options.onPublicTrades) throw new Error('no onPublicTrades callback');
+
+		try {
+			await this.waitUntilWSReady();
+			await this.ws.addSubscription(currency, baseCurrency, type);
+		} catch (err) {
+			console.error(this.GetName() + ` Subscribe got error:`, err);
+			throw err;
+		}
 	}
 
 	GetTicker(...args) {
