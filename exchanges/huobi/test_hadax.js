@@ -1,4 +1,4 @@
-const { HUOBI } = require('../../index.js');
+const { HADAX, RateLimiter } = require('../../index.js');
 const config = require('../../accounts.config.json');
 const assert = require('better-assert');
 const debug = require('debug')('log');
@@ -7,12 +7,14 @@ const debug = require('debug')('log');
 const wait = require('delay');
 const moment = require('moment');
 
-let ex = new HUOBI({
-	Currency: 'QTUM',
-	BaseCurrency: 'USDT',
+let ex = new HADAX({
+	Currency: 'IDT',
+	BaseCurrency: 'BTC',
 	Key: config.huobi.key,
 	Secret: config.huobi.secret,
-	isWS: false
+	isWS: false,
+	hadax: true,
+	rateLimiter: new RateLimiter(1000, 1)
 });
 
 let ids = {}, stocks = 0, balance = 0, lastPrice = 0;
@@ -29,26 +31,17 @@ describe('test huobi', function() {
 		debug(t);
 		assert(t);
 		assert(t.Last && t.Buy && t.Sell && t.Time && t.High && t.Low);
-		assert(t.Currency === 'QTUM');
-		assert(t.BaseCurrency === 'USDT');
+		assert(t.Currency === 'IDT');
+		assert(t.BaseCurrency === 'BTC');
 	});
 
 	it('should get ticker 2', async () => {
-		let t = await ex.GetTicker('EOS', 'USDT');
+		let t = await ex.GetTicker('YCC', 'ETH');
 		debug(t);
 		assert(t);
 		assert(t.Last && t.Buy && t.Sell && t.Time && t.High && t.Low);
-		assert(t.Currency === 'EOS');
-		assert(t.BaseCurrency === 'USDT');
-	});
-
-	it('should get ticker 3', async () => {
-		let t = await ex.GetTicker('ETH', 'BTC');
-		debug(t);
-		assert(t);
-		assert(t.Last && t.Buy && t.Sell && t.Time && t.High && t.Low);
-		assert(t.Currency === 'ETH');
-		assert(t.BaseCurrency === 'BTC');
+		assert(t.Currency === 'YCC');
+		assert(t.BaseCurrency === 'ETH');
 	});
 
 	it('should get depth', async () => {
@@ -59,20 +52,20 @@ describe('test huobi', function() {
 		assert(t.Asks.length > 0 && t.Bids.length > 0);
 		assert(t.Asks[0].Price > 0 && t.Asks[0].Amount > 0);
 		assert(t.Bids[0].Price > 0 && t.Bids[0].Amount > 0);
-		assert(t.Currency === 'QTUM');
-		assert(t.BaseCurrency === 'USDT');
+		assert(t.Currency === 'IDT');
+		assert(t.BaseCurrency === 'BTC');
 	});
 
 	it('should get depth 2', async () => {
-		let t = await ex.GetDepth('EOS', 'BTC');
+		let t = await ex.GetDepth('YCC', 'ETH');
 		debug(t);
 		assert(t);
 		assert(t.Asks && t.Bids);
 		assert(t.Asks.length > 0 && t.Bids.length > 0);
 		assert(t.Asks[0].Price > 0 && t.Asks[0].Amount > 0);
 		assert(t.Bids[0].Price > 0 && t.Bids[0].Amount > 0);
-		assert(t.Currency === 'EOS');
-		assert(t.BaseCurrency === 'BTC');
+		assert(t.Currency === 'YCC');
+		assert(t.BaseCurrency === 'ETH');
 	});
 
 	it('should get account', async () => {
@@ -83,20 +76,20 @@ describe('test huobi', function() {
 		assert(Object.keys(t).indexOf('FrozenStocks') > -1);
 		assert(Object.keys(t).indexOf('Balance') > -1);
 		assert(Object.keys(t).indexOf('FrozenBalance') > -1);
-		assert(t.Currency === 'QTUM');
-		assert(t.BaseCurrency === 'USDT');
+		assert(t.Currency === 'IDT');
+		assert(t.BaseCurrency === 'BTC');
 	});
 
 	it('should get account 2', async () => {
-		let t = await ex.GetAccount('EOS', 'BTC');
+		let t = await ex.GetAccount('YCC', 'ETH');
 		debug(t);
 		assert(t);
 		assert(Object.keys(t).indexOf('Stocks') > -1);
 		assert(Object.keys(t).indexOf('FrozenStocks') > -1);
 		assert(Object.keys(t).indexOf('Balance') > -1);
 		assert(Object.keys(t).indexOf('FrozenBalance') > -1);
-		assert(t.Currency === 'EOS');
-		assert(t.BaseCurrency === 'BTC');
+		assert(t.Currency === 'YCC');
+		assert(t.BaseCurrency === 'ETH');
 	});
 
 	it('should get accounts', async () => {
@@ -120,90 +113,90 @@ describe('test huobi', function() {
 
 	it('should buy', async () => {
 
-		let orderId = await ex.Buy(400, 0.01, 'ETH', 'USDT');
+		let orderId = await ex.Buy(0.0000030137, 1);
 		debug(orderId);
 		assert(orderId);
-		let orderInfo = await ex.GetOrder(orderId, 'ETH', 'USDT');
+		let orderInfo = await ex.GetOrder(orderId);
 		debug(orderInfo);
 		assert(orderInfo);
 		assert(orderInfo.Id);
-		assert(orderInfo.Price === 400);
-		assert(orderInfo.Amount === 0.01);
+		assert(orderInfo.Price === 0.0000030137);
+		assert(orderInfo.Amount === 1);
 		assert(orderInfo.DealAmount === 0);
 		assert(orderInfo.Type === 'Buy');
 		assert(orderInfo.Time);
 		assert(orderInfo.Status === 'Pending');
-		assert(orderInfo.Currency === 'ETH');
-		assert(orderInfo.BaseCurrency === 'USDT');
+		assert(orderInfo.Currency === 'IDT');
+		assert(orderInfo.BaseCurrency === 'BTC');
 	});
 
-	it('should sell', async () => {
-		let orderId = await ex.Sell(700, 0.01, 'ETH', 'USDT');
-		debug(orderId);
-		assert(orderId);
-		let orderInfo = await ex.GetOrder(orderId, 'ETH', 'USDT');
-		debug(orderInfo);
-		assert(orderInfo);
-		assert(orderInfo.Id);
-		assert(orderInfo.Price === 700);
-		assert(orderInfo.Amount === 0.01);
-		assert(orderInfo.DealAmount === 0);
-		assert(orderInfo.Type === 'Sell');
-		assert(orderInfo.Time);
-		assert(orderInfo.Status === 'Pending');
-		assert(orderInfo.Currency === 'ETH');
-		assert(orderInfo.BaseCurrency === 'USDT');
-	});
+	// it('should sell', async () => {
+	// 	let orderId = await ex.Sell(700, 0.01, 'ETH', 'USDT');
+	// 	debug(orderId);
+	// 	assert(orderId);
+	// 	let orderInfo = await ex.GetOrder(orderId, 'ETH', 'USDT');
+	// 	debug(orderInfo);
+	// 	assert(orderInfo);
+	// 	assert(orderInfo.Id);
+	// 	assert(orderInfo.Price === 700);
+	// 	assert(orderInfo.Amount === 0.01);
+	// 	assert(orderInfo.DealAmount === 0);
+	// 	assert(orderInfo.Type === 'Sell');
+	// 	assert(orderInfo.Time);
+	// 	assert(orderInfo.Status === 'Pending');
+	// 	assert(orderInfo.Currency === 'ETH');
+	// 	assert(orderInfo.BaseCurrency === 'USDT');
+	// });
 
 	it('should get orders', async () => {
-		let pendingOrders = await ex.GetOrders('ETH', 'USDT');
+		let pendingOrders = await ex.GetOrders();
 		debug(pendingOrders);
 		assert(pendingOrders);
 		assert(pendingOrders[0]);
 		let orderInfo = pendingOrders[0];
 		assert(orderInfo.Id);
-		assert(orderInfo.Price === 700);
-		assert(orderInfo.Amount === 0.01);
+		assert(orderInfo.Price === 0.0000030137);
+		assert(orderInfo.Amount === 1);
 		assert(orderInfo.DealAmount === 0);
-		assert(orderInfo.Type === 'Sell');
+		assert(orderInfo.Type === 'Buy');
 		assert(orderInfo.Time);
 		assert(orderInfo.Status === 'Pending');
-		assert(orderInfo.Currency === 'ETH');
-		assert(orderInfo.BaseCurrency === 'USDT');
+		assert(orderInfo.Currency === 'IDT');
+		assert(orderInfo.BaseCurrency === 'BTC');
 	});
 
-	it('should cancel buy order', async () => {
-		let a = await ex.GetOrders('ETH', 'USDT');
-		debug(a);
-		assert(a.length > 0);
+	// it('should cancel buy order', async () => {
+	// 	let a = await ex.GetOrders('ETH', 'USDT');
+	// 	debug(a);
+	// 	assert(a.length > 0);
 
-		let re = await ex.CancelOrder(a[0].Id, 'ETH', 'USDT');
-		debug(re);
-		console.log(re);
-		console.log(await ex.GetOrder(a[0].Id, 'ETH', 'USDT'));
+	// 	let re = await ex.CancelOrder(a[0].Id, 'ETH', 'USDT');
+	// 	debug(re);
+	// 	console.log(re);
+	// 	console.log(await ex.GetOrder(a[0].Id, 'ETH', 'USDT'));
 
-		await wait(20000);
+	// 	await wait(20000);
 
-		console.log(await ex.GetOrder(a[0].Id, 'ETH', 'USDT'));
+	// 	console.log(await ex.GetOrder(a[0].Id, 'ETH', 'USDT'));
 
-		let a2 = await ex.GetOrders('ETH', 'USDT');
-		debug(a2);
-		assert(a2.length === 1);
-	});
+	// 	let a2 = await ex.GetOrders('ETH', 'USDT');
+	// 	debug(a2);
+	// 	assert(a2.length === 1);
+	// });
 
 	
 
 	it('should cancel all pending orders', async () => {
-		let a = await ex.GetOrders('ETH', 'USDT');
+		let a = await ex.GetOrders();
 		debug(a);
 		assert(a.length > 0);
 
-		let re = await ex.CancelPendingOrders('ETH', 'USDT');
+		let re = await ex.CancelPendingOrders();
 		debug(re);
 
 		await wait(20000);
 
-		let a2 = await ex.GetOrders('ETH', 'USDT');
+		let a2 = await ex.GetOrders();
 		debug(a2);
 		assert(a2.length === 0);
 	});

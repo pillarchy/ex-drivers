@@ -71,6 +71,7 @@ class HUOBI_REST {
 			let s = await res.text();
 			let status = res.status;
 
+			if (status === 429) throw new ExError(ErrorCode.REQUEST_TOO_FAST, '429 request too fast');
 			if (status !== 200) throw new ExError(ErrorCode.BAD_RESPONSE_STATUS, `Huobi response bad status(${status})`, s);
 
 			debug('>>>', s);

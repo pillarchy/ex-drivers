@@ -4,9 +4,6 @@ const N = require('precise-number');
 const R = require('ramda');
 const EXCHANGE = require('../exchange.js');
 
-const ExError = require('../../lib/error');
-const ErrorCode = require('../../lib/error-code');
-
 class HUOBI extends EXCHANGE {
 	constructor(options) {
 		options = Object.assign({
@@ -16,10 +13,8 @@ class HUOBI extends EXCHANGE {
 				Taker: 0.002
 			},
 			RateLimit: 10,
-			Decimals: 2,
 			MinTradeStocks: 0.001,
-			DefaultDepthStep: 'step0',
-			StockDecimals: 4
+			DefaultDepthStep: 'step0'
 		}, options);
 		options.domain = options.hadax ? 'api.hadax.com' : 'api.huobipro.com';
 		super(options);
