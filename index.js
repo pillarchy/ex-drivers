@@ -5,6 +5,7 @@ module.exports = {
 	BITFINEX: require('./exchanges/bitfinex/index.js'),
 	BITFLYER_FX: require('./exchanges/bitflyer_fx/index.js'),
 	HUOBI: require('./exchanges/huobi/index.js'),
+	HADAX: require('./exchanges/huobi/hadax.js'),
 	ZB: require('./exchanges/zb/index.js'),
 	BITTREX: require('./exchanges/bittrex/index.js'),
 

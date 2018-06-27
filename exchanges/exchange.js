@@ -37,7 +37,7 @@ class EXCHANGE {
 		while (!this.wsReady) {
 			await wait(200);
 			if (Date.now() - startTime > this.options.WSTimeout) {
-				throw new Error(this.GetName() + ' websocket timeout');
+				throw new Error(this.GetName() + ' websocket connection timeout');
 			}
 		}
 		return true;
@@ -72,6 +72,13 @@ class EXCHANGE {
 	 */
 	GetMin() {
 		return this.options.MinTradeAmount || 0.01;
+	}
+
+	async GetAccountsMap(...args) {
+		return (await this.GetAccounts(...args)).reduce((map, a) => {
+			map[a.Currency] = a;
+			return map;
+		}, {});
 	}
 }
 

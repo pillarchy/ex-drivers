@@ -1,5 +1,5 @@
-const EXCHANGE_REST = require('./huobipro.rest.js');
-const EXCHANGE_WS = require('./huobipro.ws.js');
+const REST = require('./rest.js');
+const WS = require('./ws.js');
 const N = require('precise-number');
 const R = require('ramda');
 const EXCHANGE = require('../exchange.js');
@@ -13,69 +13,62 @@ class HUOBI extends EXCHANGE {
 				Taker: 0.002
 			},
 			RateLimit: 10,
-			Decimals: 2,
 			MinTradeStocks: 0.001,
-			StockDecimals: 4
+			DefaultDepthStep: 'step0'
 		}, options);
 		options.domain = options.hadax ? 'api.hadax.com' : 'api.huobipro.com';
 		super(options);
 
-		this.isWS = options.isWS;
-		if (this.isWS) {
-			this.ws = new EXCHANGE_WS(this.options);
+		if (this.options.isWS) {
+			this.ws = new WS(this.options);
+			this.ws.on('connect', () => {
+				this.wsReady = true;
+			});
+			this.ws.on('close', () => {
+				this.wsReady = false;
+			});
 		}
-		this.rest = new EXCHANGE_REST(this.options);
-	}
 
-	waitUntilWSReady() {
-		if (!this.ws) return false;
-		return this.ws.waitUntilWSReady();
+		this.rest = new REST(this.options);
 	}
 
 	getHandler() {
-		return this.isWS ? this.ws : this.rest;
+		return this.options.isWS ? this.ws : this.rest;
 	}
 
 	GetAccount(...args) {
 		return this.rest.GetAccount(...args);
 	}
 
-	GetTicker() {
-		return this.rest.GetTicker().then(t => {
-			return {
-				High: N.parse(t.high, this.options.Decimals),
-				Low: N.parse(t.low, this.options.Decimals),
-				Buy: N.parse(t.bid[0], this.options.Decimals),
-				BuyAmount: N.parse(t.bid[1]),
-				Sell: N.parse(t.ask[0], this.options.Decimals),
-				SellAmount: N.parse(t.ask[1]),
-				Last: N.parse((t.bid[0] + t.ask[0]) / 2, this.options.Decimals),
-				Volume: N.parse(t.vol)
-			};
-		});
+	GetAccounts(...args) {
+		return this.rest.GetAccounts(...args);
 	}
 
-	GetDepth(size) {
-		return this.rest.GetDepth(size).then(tick => {
-			tick.bids = tick.bids.map(b => {
-				return {
-					Price: N.parse(b[0]),
-					Amount: N.parse(b[1])
-				};
-			});
+	async Subscribe(currency, baseCurrency, type) {
+		if (!this.options.isWS) throw new Error('is not websocket mode');
+		if (['Depth', 'PublicTrades', 'Ticker'].indexOf(type) === -1) {
+			throw new Error('unkown subscription type: ' + type);
+		}
 
-			tick.asks = tick.asks.map(a => {
-				return {
-					Price: N.parse(a[0]),
-					Amount: N.parse(a[1])
-				};
-			});
+		if (type === 'Depth' && !this.options.onDepth) throw new Error('no onDepth callback');
+		if (type === 'Ticker' && !this.options.onTicker) throw new Error('no onTicker callback');
+		if (type === 'PublicTrades' && !this.options.onPublicTrades) throw new Error('no onPublicTrades callback');
 
-			return Promise.resolve({
-				Asks: R.sort( R.ascend( R.prop('Price') ), tick.asks),
-				Bids: R.sort( R.descend( R.prop('Price') ), tick.bids)
-			});
-		});
+		try {
+			await this.waitUntilWSReady();
+			await this.ws.addSubscription(currency, baseCurrency, type);
+		} catch (err) {
+			console.error(this.GetName() + ` Subscribe got error:`, err);
+			throw err;
+		}
+	}
+
+	GetTicker(...args) {
+		return this.rest.GetTicker(...args);
+	}
+
+	GetDepth(...args) {
+		return this.rest.GetDepth(...args);
 	}
 
 	GetRecords(minutes) {
@@ -98,8 +91,8 @@ class HUOBI extends EXCHANGE {
 		});
 	}
 
-	GetOrder(orderId) {
-		return this.rest.GetOrder(orderId).then(data => {
+	GetOrder(orderId, Currency, BaseCurrency) {
+		return this.rest.GetOrder(orderId, Currency, BaseCurrency).then(data => {
 			if (data && data.id) {
 				return this._transform_order(data);
 			} else {
@@ -134,55 +127,61 @@ class HUOBI extends EXCHANGE {
 		return {
 			Id: data.id,
 			Price: N.parse(data.price),
+			AvgPrice: N.parse(data.price),
 			Amount: N.parse(data.amount),
 			DealAmount: N.parse(data['field-amount']),
 			Status: STATUS[data.state] || 'Unknown',
 			Type: TYPES[data.type] || 'Unknown',
 			Fee: N.parse(data['field-fees']),
-			Time: N.parse(data['created-at'])
+			Time: N.parse(data['created-at']),
+			...this.rest._parse_ch(data.symbol),
+			Info: data
 		};
 	}
 
-	Buy(price, amount) {
-		amount = N(amount).floor(this.options.StockDecimals) * 1;
-		price = N(price).round(this.options.Decimals) * 1;
-		if (amount < this.GetMin()) throw new Error(this.GetName() + ' buy amount should not less than ' + this.GetMin());
-		return this.rest.Buy(price, amount);
+	Buy(...args) {
+		return this.Trade('Buy', ...args);	
 	}
 
-	Sell(price, amount) {
-		amount = N(amount).floor(this.options.StockDecimals) * 1;
-		price = N(price).round(this.options.Decimals) * 1;
-		if (amount < this.GetMin()) throw new Error(this.GetName() + ' sell amount should not less than ' + this.GetMin());
-		return this.rest.Sell(price, amount);
+	Sell(...args) {
+		return this.Trade('Sell', ...args);	
 	}
 
-	CancelOrder(orderId) {
-		return this.rest.CancelOrder(orderId);
+	Trade(type, price, amount, Currency, BaseCurrency) {
+		if (type !== 'Buy' && type !== 'Sell') throw new Error('wrong trade type: ' + type);
+		if (this.options.StockDecimals) amount = N(amount).floor(this.options.StockDecimals);
+		if (this.options.Decimals) price = N(price).round(this.options.Decimals);
+		if (amount <= 0) throw new Error('trade amount should greater than 0');
+		return this.rest.Trade(type, price, amount, Currency, BaseCurrency);
 	}
 
-	CancelPendingOrders() {
-		return this.GetOrders().then(async orders => {
+	CancelOrder(orderId, Currency, BaseCurrency) {
+		return this.rest.CancelOrder(orderId, Currency, BaseCurrency);
+	}
+
+	CancelPendingOrders(Currency, BaseCurrency) {
+		return this.GetOrders(Currency, BaseCurrency).then(async orders => {
 			let ids = orders.map(o => o.Id);
 			console.log('cancelling', ids);
 			while (ids && ids.length > 0) {
 				let _ids = ids.splice(0, 50);
-				await this.rest.CancelOrders(_ids);
+				await this.rest.CancelOrders(_ids, Currency, BaseCurrency);
 			}
 			return true;
 		});
 	}
 
-	GetOrders() {
-		return this.rest.GetOrders().then(data => {
-			let orders = [];
-			if (data && data.length > 0) {
-				data.map(o => {
-					orders.push(this._transform_order(o));
-				});
-			}
-			orders = orders.filter(o => (o.Status !== 'Cancelled' && o.Status !== 'Closed'));
-			return Promise.resolve(orders);
+	GetOrders(Currency, BaseCurrency) {
+		return this.rest.GetOrders(Currency, BaseCurrency).then(orders => {
+			return orders.map(this._transform_order.bind(this)).filter(o => (o.Status !== 'Cancelled' && o.Status !== 'Closed'));
+		});
+	}
+
+	GetTrades(Currency, BaseCurrency) {
+		return this.rest.GetTrades(Currency, BaseCurrency).then(orders => {
+			return orders.map(this._transform_order.bind(this)).filter(o => (o.Status === 'Cancelled' || o.Status === 'Closed') && o.DealAmount > 0);
+		}).then(trades => {
+			return R.sort( R.ascend( R.prop('Time') ), trades);
 		});
 	}
 

@@ -1,9 +1,9 @@
 const ExDrivers = require('../../index.js');
 const config = require('../../accounts.config.json');
 
-let HUOBI = new ExDrivers.HUOBI({
-	Currency: 'BTC',
-	BaseCurrency: 'USDT',
+let HUOBI = new ExDrivers.HADAX({
+	Currency: 'IDT',
+	BaseCurrency: 'BTC',
 	Key: config.huobi.key,
 	Secret: config.huobi.secret,
 	isWS: true,
@@ -19,7 +19,7 @@ let HUOBI = new ExDrivers.HUOBI({
 });
 
 //subscribe more data
-HUOBI.Subscribe('EOS', 'USDT', 'Depth');
-HUOBI.Subscribe('EOS', 'USDT', 'Ticker');
-HUOBI.Subscribe('EOS', 'USDT', 'PublicTrades');
+HUOBI.Subscribe('YCC', 'ETH', 'Depth');
+HUOBI.Subscribe('YCC', 'ETH', 'Ticker');
+HUOBI.Subscribe('YCC', 'ETH', 'PublicTrades');
 

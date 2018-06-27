@@ -201,7 +201,7 @@ class ZB extends EXCHANGE {
 				return [];
 			}
 			arr = arr.map(o => this._transform_order(o));
-			arr = R.sort( R.descend( R.prop('Time') ), arr);
+			arr = R.sort( R.ascend( R.prop('Time') ), arr);
 			return arr;
 		}).catch(err => {
 			if (err.code === 3001) return [];
@@ -209,7 +209,7 @@ class ZB extends EXCHANGE {
 		});	
 	}
 
-	async GetTrades(page = 1, pageSize = 100, Currency = '', BaseCurrency = '') {
+	async GetTrades(Currency, BaseCurrency, page = 1, pageSize = 100) {
 		if (!Currency) Currency = this.options.Currency;
 		if (!BaseCurrency) BaseCurrency = this.options.BaseCurrency;
 
@@ -219,6 +219,7 @@ class ZB extends EXCHANGE {
 			t.AvgPrice = t.Price;
 			return t;
 		});
+		trades = R.sort( R.ascend( R.prop('Time') ), trades);
 		return trades.filter(o => (o.Status === 'Closed' || o.Status === 'Cancelled') && o.DealAmount > 0);
 	}
 
