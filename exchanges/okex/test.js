@@ -1,171 +1,219 @@
-global.testing = true;
-const chai = require('chai');
-const expect = chai.expect;
+const { OKEX: EX } = require('../../index.js');
+const config = require('../../accounts.config.json');
+const assert = require('better-assert');
+const debug = require('debug')('log');
 
-let config = require('../../accounts.config.json');
+const wait = require('delay');
+const moment = require('moment');
 
-const OKCoin = require('./index.js');
-const Exchange = new OKCoin({
-	Key: config.okex_lclgg002.key,
-	Secret: config.okex_lclgg002.secret,
-	Currency: 'ETH',
-	BaseCurrency: 'BTC',
-	isWS: true,
-	// onAccountChange(a) {
-	// 	console.log('on account change', a);
-	// },
-	onIndex(index) {
-		console.log('on index', index);
-	}
+let ex = new EX({
+	Currency: 'ETC',
+	BaseCurrency: 'USDT',
+	Key: config.ok01.key,
+	Secret: config.ok01.secret,
+	isWS: false 
 });
 
-const log = console.log.bind(console);
+let ids = {}, stocks = 0, balance = 0, lastPrice = 0;
 
-describe('test okex rest api', function () {
-	this.timeout(30000);
+describe('test zb', function() {
+	this.timeout(10000000);
 
-	it('should wait until ws ready', () => Exchange.waitUntilWSReady());
-
-	it('should get ticker', () => Exchange.GetTicker().then(log));
-
-	it('should get depth', () => Exchange.GetDepth().then(log));
-
-	it('should get account info', () => Exchange.GetAccount().then(log));
-
-	let pendingOrders = null;
-	it('should get pending orders', () => {
-		return Exchange.GetOrders().then(a => {
-			log(a);
-			expect(a).to.be.an('array');
-			pendingOrders = a;
-			console.log(a.length, 'pending orders');
-		});
+	it('should wait until websocket ready', () => {
+		return ex.waitUntilWSReady();
 	});
 
-	it('cancel fake order ', () => {
-		return Exchange.CancelOrder(1234567).then(a => {
-			log('fake order then:', a);	
-		}).catch(err => {
-			log('fake order catch:', err);
-		});
-	});
+	// it('should get ticker', async () => {
+	// 	let t = await ex.GetTicker();
+	// 	debug(t);
+	// 	assert(t);
+	// 	assert(t.Last && t.Buy && t.Sell && t.Time && t.High && t.Low);
+	// 	assert(t.Currency === 'ETC');
+	// 	assert(t.BaseCurrency === 'USDT');
 
-	it('get fake order ', () => {
-		return Exchange.GetOrder(1234567).then(a => {
-			throw new Error('this should throw an error. but it didnt');
-		}).catch(err => {
-			log(err);
-		});
-	});
+	// 	t = await ex.GetTicker('EOS', 'USDT');
+	// 	debug(t);
+	// 	assert(t.Last && t.Buy && t.Sell && t.Time && t.High && t.Low);
+	// 	assert(t.Currency === 'EOS');
+	// 	assert(t.BaseCurrency === 'USDT');
+	// });
 
-	it('cancel pending orders ', () => {
-		if (pendingOrders && pendingOrders.length > 0) {
-			let o = pendingOrders.shift();
-			console.log('cancelling order ', o.Id);
-			return Exchange.CancelOrder(o.Id).then(a => {
-				expect(a).to.be.true;
-			});
-		} else {
-			console.log('no pending orders');
-			return Promise.resolve(1);
+	// it('should get depth', async () => {
+	// 	let t = await ex.GetDepth();
+	// 	debug(t);
+	// 	assert(t);
+	// 	assert(t.Asks && t.Bids);
+	// 	assert(t.Asks.length > 0 && t.Bids.length > 0);
+	// 	assert(t.Asks[0].Price > 0 && t.Asks[0].Amount > 0);
+	// 	assert(t.Bids[0].Price > 0 && t.Bids[0].Amount > 0);
+	// 	assert(t.Currency === 'ETC');
+	// 	assert(t.BaseCurrency === 'USDT');
+
+	// 	t = await ex.GetDepth('EOS', 'BTC');
+	// 	debug(t);
+	// 	assert(t.Asks && t.Bids);
+	// 	assert(t.Currency === 'EOS');
+	// 	assert(t.BaseCurrency === 'BTC');
+	// });
+
+	// it('should get account', async () => {
+	// 	let t = await ex.GetAccount();
+	// 	debug(t);
+	// 	assert(t);
+	// 	assert(Object.keys(t).indexOf('Stocks') > -1);
+	// 	assert(Object.keys(t).indexOf('FrozenStocks') > -1);
+	// 	assert(Object.keys(t).indexOf('Balance') > -1);
+	// 	assert(Object.keys(t).indexOf('FrozenBalance') > -1);
+	// 	assert(t.Currency === 'ETC');
+	// 	assert(t.BaseCurrency === 'USDT');
+
+	// 	let t2 = await ex.GetAccount('EOS', 'USDT');
+	// 	debug(t2);
+	// 	assert(t2.Currency === 'EOS');
+	// 	assert(t2.BaseCurrency === 'USDT');
+	// });
+
+	// it('should get accounts', async () => {
+	// 	let a = await ex.GetAccounts();
+	// 	debug(a);
+	// 	assert(a);
+	// 	assert(a[0]);
+	// 	assert(a[0].Currency);
+	// 	assert(Object.keys(a[0]).indexOf('Free') > -1);
+	// 	assert(Object.keys(a[0]).indexOf('Frozen') > -1);
+	// });
+
+
+	// it('should buy', async () => {
+	// 	let orderId = await ex.Buy(15, 0.01);
+	// 	debug(orderId);
+	// 	assert(orderId);
+	// 	await wait(3000);
+	// 	let orderInfo = await ex.GetOrder(orderId);
+	// 	debug(orderInfo);
+	// 	assert(orderInfo);
+	// 	assert(orderInfo.Id);
+	// 	assert(orderInfo.Price === 15);
+	// 	assert(orderInfo.Amount === 0.01);
+	// 	assert(orderInfo.DealAmount === 0);
+	// 	assert(orderInfo.Type === 'Buy');
+	// 	assert(orderInfo.Time);
+	// 	assert(orderInfo.Status === 'Pending');
+	// 	assert(orderInfo.Currency === 'ETC');
+	// 	assert(orderInfo.BaseCurrency === 'USDT');
+	// });
+
+	// it('should buy', async () => {
+	// 	let orderId = await ex.Buy(0.1, 0.01, 'BCH', 'BTC');
+	// 	debug(orderId);
+	// 	assert(orderId);
+	// 	await wait(3000);
+	// 	let orderInfo = await ex.GetOrder(orderId, 'BCH', 'BTC');
+	// 	debug(orderInfo);
+	// 	assert(orderInfo);
+	// 	assert(orderInfo.Id);
+	// 	assert(orderInfo.Price === 0.1);
+	// 	assert(orderInfo.Amount === 0.01);
+	// 	assert(orderInfo.DealAmount === 0);
+	// 	assert(orderInfo.Type === 'Buy');
+	// 	assert(orderInfo.Time);
+	// 	assert(orderInfo.Status === 'Pending');
+	// 	assert(orderInfo.Currency === 'BCH');
+	// 	assert(orderInfo.BaseCurrency === 'BTC');
+	// });
+
+
+	// it('should get orders', async () => {
+	// 	let pendingOrders = await ex.GetOrders();
+	// 	debug(pendingOrders);
+	// 	assert(pendingOrders);
+	// 	assert(pendingOrders[0]);
+	// 	let orderInfo = pendingOrders[0];
+	// 	assert(orderInfo.Id);
+	// 	assert(orderInfo.Price === 15);
+	// 	assert(orderInfo.Amount === 0.01);
+	// 	assert(orderInfo.DealAmount === 0);
+	// 	assert(orderInfo.Type === 'Buy');
+	// 	assert(orderInfo.Time);
+	// 	assert(orderInfo.Status === 'Pending');
+	// 	assert(orderInfo.Currency === 'ETC');
+	// 	assert(orderInfo.BaseCurrency === 'USDT');
+	// });
+
+	// it('should cancel buy order', async () => {
+	// 	let a = await ex.GetOrders('BCH', 'BTC');
+	// 	debug(a);
+	// 	assert(a.length > 0);
+
+	// 	// let re = await ex.CancelOrder(a[0].Id, 'BCH', 'BTC');
+	// 	// debug(re);
+
+	// 	let re2 = await ex.CancelPendingOrders('BCH', 'BTC');
+	// 	debug(re2);
+	// 	await wait(2000);
+	// 	let a2 = await ex.GetOrders('BCH', 'BTC');
+	// 	debug(a2);
+	// 	assert(a2.length === 0);
+	// });
+
+	
+
+	// it('should cancel all pending orders', async () => {
+	// 	let a = await ex.GetOrders();
+	// 	debug(a);
+	// 	assert(a.length > 0);
+
+	// 	let re = await ex.CancelPendingOrders();
+	// 	debug(re);
+
+	// 	await wait(1000);
+
+	// 	let a2 = await ex.GetOrders();
+	// 	debug(a2);
+	// 	assert(a2.length === 0);
+	// });
+
+
+	
+
+	it('should get trades', async () => {
+		let t = 0;
+		while ( t < 100 ) {
+			try {
+				let arr = await ex.GetTrades('BTC', 'USDT');
+				arr = arr.filter(o => {
+					return !ids[o.Id];
+				});
+
+				arr = arr.map(o => {
+					ids[o.Id] = true;
+					// delete o.Info;
+					o.Time = moment(o.Time).format('YYYY-MM-DD HH:mm:ss:SSS');
+					return o;
+				});
+
+				arr.map(o => {
+					if (o.Type === 'Buy') {
+						balance -= o.DealAmount * o.AvgPrice;
+						stocks += o.DealAmount;
+					} else {
+						balance += o.DealAmount * o.AvgPrice;
+						stocks -= o.DealAmount;
+					}
+					lastPrice = o.AvgPrice;
+				});
+
+				console.log(arr);
+
+				let value = stocks * lastPrice + balance;
+				console.log(`stocks = ${stocks} balance = ${balance} value = ${value}`);
+			} catch (err) {
+				console.error(err);
+			}
+			await wait(1000);
+			t++;
 		}
 	});
 
-	// let orderId = null;
-
-	// it('should buy', () => {
-	// 	return Exchange.Buy(8000, 0.01).then(i => {
-	// 		console.log('orderId=', i);
-	// 		orderId = i;
-	// 	});
-	// });
-
-
-	// it('get order info', () => {
-	// 	if (orderId) {
-	// 		return Exchange.GetOrder(orderId).then(log);
-	// 	} else {
-	// 		return Promise.resolve(1);
-	// 	}
-	// });
-
-	// let account = null;
-	// it('get account info again', done => {
-	// 	Exchange.GetAccount().then(a => {
-	// 		expect(a.Balance > 0).to.be.true;
-	// 		expect(a.Stocks > 0).to.be.true;
-	// 		account = a;
-	// 		console.log(a);
-	// 		done();
-	// 	}).catch(err => setTimeout(() => {throw err;}));
-	// });
-
-	// let sellOrderId = null;
-	// it('should sell at 20000', done => {
-	// 	Exchange.Sell(10000, 0.001).then(orderId => {
-	// 		sellOrderId = orderId;
-	// 		done();
-	// 	}).catch(err => setTimeout(() => {throw err;}));
-	// });
-
-	// it('get order info', done => {
-	// 	if (sellOrderId) {
-	// 		Exchange.GetOrder(sellOrderId).then(o => {
-	// 			console.log(o);
-	// 			expect(o).to.be.an('object');
-	// 			expect(o.Type).to.equal('Sell');
-	// 			done();
-	// 		}).catch(err => setTimeout(() => {throw err;}));
-	// 	} else {
-	// 		done();
-	// 	}
-	// });
-
-	// it('cancel sell order ', () => {
-	// 	if (sellOrderId) {
-	// 		return Exchange.CancelOrder(sellOrderId).then(a => {
-	// 			expect(a).to.be.true;
-	// 			console.log(a);
-	// 		});
-	// 	} else {
-	// 		return Promise.resolve(1);
-	// 	}
-	// });
-
-	// it('should sell', ()=>Exchange.Sell(0.044, 0.01));
-
-	// it('should sell', done=>{
-	// 	Exchange.Sell(0.046, 0.01).then(orderId=>{
-	// 		done();
-	// 	}).catch(err=>setTimeout(()=>{throw err}));
-	// });
-
-	// it('should sell', done=>{
-	// 	Exchange.Sell(0.05, 0.01).then(orderId=>{
-	// 		done();
-	// 	}).catch(err=>setTimeout(()=>{throw err}));
-	// });
-
-	// it('should buy', done=>{
-	// 	Exchange.Buy(0.04, 0.01).then(orderId=>{
-	// 		done();
-	// 	}).catch(err=>setTimeout(()=>{throw err}));
-	// });
-
-	it('cancel all pending orders', done => {
-		Exchange.CancelPendingOrders().then(a => {
-			console.log(a);
-			done();
-		}).catch(err => setTimeout(() => {throw err;}));
-	});
-
-	// it('get account info again', done=>{
-	// 	Exchange.GetAccount().then(a=>{
-	// 		console.log(a);
-	// 		expect(a.Balance>0).to.be.true;
-	// 		expect(a.Stocks>=0).to.be.true;
-	// 		done();
-	// 	}).catch(err=>setTimeout(()=>{throw err}));
-	// });
 
 });

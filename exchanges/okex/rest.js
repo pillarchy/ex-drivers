@@ -1,20 +1,17 @@
 const { md5 }  = require('utility');
-const fetch = require('../../lib/fetch');
+const fetch = require('node-fetch');
 const N = require('precise-number');
 const R = require('ramda');
 const debug = require('debug')('exchange:okex:rest');
 const RateLimit = require('../../lib/rate-limit');
 const ExError = require('../../lib/error');
 const ErrorCode = require('../../lib/error-code');
+const agent = require('../../lib/agent');
 
 
-
-class OKCoin {
+class OKEX_REST {
 
 	constructor(options) {
-		this.debug = true;
-		this.key = options.Key;
-		this.secret = options.Secret;
 		this.symbol = options.Currency.toLowerCase() + '_' + options.BaseCurrency.toLowerCase();
 		this.options = options;
 
@@ -24,11 +21,33 @@ class OKCoin {
 		this.orderInfoRateLimiter = new RateLimit(2000, 20);
 	}
 
+	_getSymbol(Currency, BaseCurrency) {
+		let c = Currency || this.options.Currency;
+		let bc = BaseCurrency || this.options.BaseCurrency;
+		return c.toLowerCase() + '_' + bc.toLowerCase();
+	}
+
+	_parse_ch(ch) {
+		if (!ch) ch = '';
+		let ms = ch.match(/^([0-9a-z]+)\_([0-9a-z]+)$/);
+		if (ms && ms[1] && ms[2]) {
+			return {
+				Currency: String(ms[1]).toUpperCase(),
+				BaseCurrency: String(ms[2]).toUpperCase()
+			};
+		} else {
+			return {
+				Currency: this.options.Currency,
+				BaseCurrency: this.options.BaseCurrency
+			};
+		}
+	}
+
 	async fetch(url, params, method) {
 		await this.options.rateLimiter.wait();
 		if (!params) params = {};
-		params.api_key = this.key;
-		params.sign = sign(params, this.secret);
+		params.api_key = this.options.Key;
+		params.sign = sign(params, this.options.Secret);
 
 		let vars = [];
 		for (let key in params) {
@@ -44,7 +63,7 @@ class OKCoin {
 			method: httpMethod,
 			timeout: httpMethod === 'GET' ? 2000 : 5000,
 			headers: {},
-			forever: true
+			agent: agent.https
 		};
 
 		if (httpMethod === 'POST') {
@@ -54,7 +73,11 @@ class OKCoin {
 		}
 
 		url = 'https://www.okex.com/api/v1/' + url;
-		return fetch(url, options).then(r => r.json()).then(json => {
+		return fetch(url, options).then(async res => {
+			let json = await res.json();
+			let status = res.status;
+			if (status === 429) throw new ExError(ErrorCode.REQUEST_TOO_FAST, url + ' too many requests');
+
 			if (json && json.error_code) {
 				json.error_message = errorMessage(json.error_code);
 				let err = new Error(JSON.stringify(json));
@@ -63,23 +86,18 @@ class OKCoin {
 				//if (json.error_code === 1002) err.need_sync = true;
 				throw err;
 			} else {
-				return Promise.resolve(json);
+				return json;
 			}
 		}).catch(err => {
-			if (err && err.name === 'RequestError' && err.message && /ESOCKETTIMEDOUT/.test(err.message) ) {
-				throw new ExError(ErrorCode.REQUEST_TIMEOUT, url + ' timeout');
+			if (err.type === 'request-timeout') {
+				throw new ExError(ErrorCode.REQUEST_TIMEOUT, `rest request (${url}) timeout`, err);
 			}
-
-			if (err && err.name === 'StatusCodeError' && err.statusCode === 429) {
-				throw new ExError(ErrorCode.REQUEST_TOO_FAST, url + ' too many requests');
-			}
-
 			throw err;
 		});
 	}
 
-	async GetTicker() {
-		let data = await this.fetch('ticker.do?symbol=' + this.symbol, null, 'GET');
+	async GetTicker(Currency, BaseCurrency) {
+		let data = await this.fetch('ticker.do?symbol=' + this._getSymbol(Currency, BaseCurrency), null, 'GET');
 		return {
 			High: N.parse(data.ticker.high),
 			Low: N.parse(data.ticker.low),
@@ -87,7 +105,8 @@ class OKCoin {
 			Sell: N.parse(data.ticker.sell),
 			Last: N.parse(data.ticker.last),
 			Volume: N.parse(data.ticker.vol),
-			Time: N.parse(data.date) * 1000
+			Time: N.parse(data.date) * 1000,
+			...this._parse_ch(this._getSymbol(Currency, BaseCurrency))
 		};
 	}
 
@@ -96,28 +115,31 @@ class OKCoin {
 		return this.fetch('userinfo.do');
 	}
 
-	async GetOrder(orderId) {
+	/*
+	if orderId === -1, it will return all unfinished orders
+	 */
+	async GetOrder(orderId, Currency, BaseCurrency) {
 		await this.orderInfoRateLimiter.wait();
 		return this.fetch('order_info.do', {
-			symbol: this.symbol,
+			symbol: this._getSymbol(Currency, BaseCurrency),
 			order_id: orderId
 		});
 	}
 
 	//get order history
-	GetTrades(page) {
+	GetTrades(Currency, BaseCurrency, page = 1) {
 		return this.fetch('order_history.do', {
-			symbol: this.symbol,
-			status: 1,
+			symbol: this._getSymbol(Currency, BaseCurrency),
+			status: 1, //finished orders
 			current_page: page,
 			page_length: 200
 		});
 	}
 
-	async CancelOrder(orderId) {
+	async CancelOrder(orderId, Currency, BaseCurrency) {
 		await this.cancelRateLimiter.wait();
 		return this.fetch('cancel_order.do', {
-			symbol: this.symbol,
+			symbol: this._getSymbol(Currency, BaseCurrency),
 			order_id: orderId
 		}).catch(err => {
 			if (err && err.error_code) return err;
@@ -125,43 +147,35 @@ class OKCoin {
 		});
 	}
 
-	async Trade(type, price, amount) {
+	async Trade(type, price, amount, Currency, BaseCurrency) {
 		if (await this.tradeRateLimiter.wait() > 100) {
 			throw new ExError(ErrorCode.REQUEST_TOO_FAST, 'okex trade too fast');
 		}
-		let startTime = Date.now();
+
+		type = String(type).toLowerCase();
+		if (price === -1) type += '_market';
 		let params = {
-			symbol: this.symbol,
+			symbol: this._getSymbol(Currency, BaseCurrency),
 			type,
 			price,
 			amount
 		};
+		
 		if (type === 'buy_market') {
 			params.price = params.amount;
 			delete(params.amount);
 		}
+
 		if (type === 'sell_market') {
 			delete(params.price);
 		}
+
 		let re = await this.fetch('trade.do', params);
-		console.log('Trade API turn around:', Date.now() - startTime);
 		return re;
 	}
 
-	Buy(price, amount) {
-		let action = 'buy';
-		if (N.equal(price, -1)) action = 'buy_market';
-		return this.Trade(action, price, amount);
-	}
-
-	Sell(price, amount) {
-		let action = 'sell';
-		if (N.equal(price, -1)) action = 'sell_market';
-		return this.Trade(action, price, amount);
-	}
-
-	GetDepth(size, merge) {
-		let params = ['symbol=' + this.symbol];
+	GetDepth(Currency, BaseCurrency, size, merge) {
+		let params = ['symbol=' + this._getSymbol(Currency, BaseCurrency)];
 		if (!size) size = 50;
 		if (size) params.push('size=' + size);
 		if (merge) params.push('merge=' + merge);
@@ -198,8 +212,9 @@ class OKCoin {
 			});
 
 			return Promise.resolve({
-				Asks: R.sort( R.descend( R.prop('Price') ), asks),
-				Bids: R.sort( R.descend( R.prop('Price') ), bids)
+				Asks: R.sort( R.ascend( R.prop('Price') ), asks),
+				Bids: R.sort( R.descend( R.prop('Price') ), bids),
+				...this._parse_ch(this._getSymbol(Currency, BaseCurrency))
 			});
 		});
 	}
@@ -354,10 +369,10 @@ function errorMessage(code) {
 		1209:	'当前api不可用'
 	};
 	if (!codes[code]) {
-		return 'OKCoin error code: ' + code + 'is not supported';
+		return 'OKEX error code: ' + code + 'is not supported';
 	}
 
 	return codes[code];
 }
 
-module.exports = OKCoin;
+module.exports = OKEX_REST;
