@@ -23,6 +23,11 @@ describe('test zb', function() {
 		return ex.waitUntilWSReady();
 	});
 
+	it('should get public trades', async () => {
+		console.log(await ex.GetPublicTrades());
+		console.log(await ex.GetPublicTrades('BTC'));
+	});
+
 	// it('should get ticker', async () => {
 	// 	let t = await ex.GetTicker();
 	// 	debug(t);
@@ -176,44 +181,44 @@ describe('test zb', function() {
 
 	
 
-	it('should get trades', async () => {
-		let t = 0;
-		while ( t < 100 ) {
-			try {
-				let arr = await ex.GetTrades('BTC', 'USDT');
-				arr = arr.filter(o => {
-					return !ids[o.Id];
-				});
+	// it('should get trades', async () => {
+	// 	let t = 0;
+	// 	while ( t < 100 ) {
+	// 		try {
+	// 			let arr = await ex.GetTrades('BTC', 'USDT');
+	// 			arr = arr.filter(o => {
+	// 				return !ids[o.Id];
+	// 			});
 
-				arr = arr.map(o => {
-					ids[o.Id] = true;
-					// delete o.Info;
-					o.Time = moment(o.Time).format('YYYY-MM-DD HH:mm:ss:SSS');
-					return o;
-				});
+	// 			arr = arr.map(o => {
+	// 				ids[o.Id] = true;
+	// 				// delete o.Info;
+	// 				o.Time = moment(o.Time).format('YYYY-MM-DD HH:mm:ss:SSS');
+	// 				return o;
+	// 			});
 
-				arr.map(o => {
-					if (o.Type === 'Buy') {
-						balance -= o.DealAmount * o.AvgPrice;
-						stocks += o.DealAmount;
-					} else {
-						balance += o.DealAmount * o.AvgPrice;
-						stocks -= o.DealAmount;
-					}
-					lastPrice = o.AvgPrice;
-				});
+	// 			arr.map(o => {
+	// 				if (o.Type === 'Buy') {
+	// 					balance -= o.DealAmount * o.AvgPrice;
+	// 					stocks += o.DealAmount;
+	// 				} else {
+	// 					balance += o.DealAmount * o.AvgPrice;
+	// 					stocks -= o.DealAmount;
+	// 				}
+	// 				lastPrice = o.AvgPrice;
+	// 			});
 
-				console.log(arr);
+	// 			console.log(arr);
 
-				let value = stocks * lastPrice + balance;
-				console.log(`stocks = ${stocks} balance = ${balance} value = ${value}`);
-			} catch (err) {
-				console.error(err);
-			}
-			await wait(1000);
-			t++;
-		}
-	});
+	// 			let value = stocks * lastPrice + balance;
+	// 			console.log(`stocks = ${stocks} balance = ${balance} value = ${value}`);
+	// 		} catch (err) {
+	// 			console.error(err);
+	// 		}
+	// 		await wait(1000);
+	// 		t++;
+	// 	}
+	// });
 
 
 });

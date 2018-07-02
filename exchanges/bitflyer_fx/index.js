@@ -9,7 +9,7 @@ const EXCHANGE = require('../exchange.js');
 const ExError = require('../../lib/error');
 const ErrorCode = require('../../lib/error-code');
 
-class EX extends EXCHANGE {
+class BITFLYER_FX extends EXCHANGE {
 	constructor(options) {
 
 		options = Object.assign({
@@ -29,9 +29,9 @@ class EX extends EXCHANGE {
 		}, options);
 		super(options);
 
-		this.Currency = options.Currency;
 		this.options = options;
 		this.symbol = 'FX_' + options.Currency + '_' + options.BaseCurrency;
+		this.options.ContractType = this.symbol;
 
 		this.fee = {
 			Maker: 0,
@@ -39,8 +39,6 @@ class EX extends EXCHANGE {
 		};
 
 		this.rest = new REST(this.options);
-
-		this.wsReady = false;
 
 		this.orderbook = null;
 
@@ -50,6 +48,30 @@ class EX extends EXCHANGE {
 		this.events = new EventEmitter();
 
 		if (this.options.isWS) {
+			this.initiateWS();
+
+			setInterval(() => {
+				if (Date.now() - this.lastDepthTime >= 5000) {
+					console.error('websocket dead, reconnecting ... ');
+					this.initiateWS();
+				}
+			}, 5000);
+		}
+	}
+
+	initiateWS() {
+		if (this.ws) {
+			try {
+				this.ws.close();
+			} catch (err) {
+				console.error('close old ws error', err);
+			}
+		}
+
+		try {
+
+			this.wsReady = false;
+
 			this.ws = new WebSocket("wss://ws.lightstream.bitflyer.com/json-rpc");
 
 			this.ws.on("open", () => {
@@ -66,6 +88,7 @@ class EX extends EXCHANGE {
 			});
 
 			this.ws.on("channelMessage", notify => {
+				this.wsReady = true;
 				//console.log(notify);
 				if (notify.channel === 'lightning_board_snapshot_' + this.symbol) {
 					this.buildOrderBook(notify.message);
@@ -75,6 +98,8 @@ class EX extends EXCHANGE {
 					console.error('unkonwn event', notify);
 				}
 			});
+		} catch (err) {
+			console.error("new websocket error", err);
 		}
 	}
 
@@ -91,7 +116,6 @@ class EX extends EXCHANGE {
 				this.orderbook.Bids[r.price] = N.parse(r.size);
 			});
 		}
-		this.wsReady = true;
 		this.onDepthData();
 	}
 
@@ -177,7 +201,10 @@ class EX extends EXCHANGE {
 
 		let depth = {
 			Asks: R.sort( R.ascend( R.prop('Price') ), asks),
-			Bids: R.sort( R.descend( R.prop('Price') ), bids)
+			Bids: R.sort( R.descend( R.prop('Price') ), bids),
+			Currency: this.options.Currency,
+			BaseCurrency: this.options.BaseCurrency,
+			ContractType: this.options.ContractType
 		};
 
 		if (typeof this.options.onDepth === 'function') {
@@ -225,7 +252,11 @@ class EX extends EXCHANGE {
 				Time: moment(data.timestamp).format('x') * 1,
 				High: N.parse(data.best_ask),
 				Low: N.parse(data.best_bid),
-				Volume: N.parse(data.volume_by_product)
+				Volume: N.parse(data.volume_by_product),
+				Currency: this.options.Currency,
+				BaseCurrency: this.options.BaseCurrency,
+				ContractType: this.options.ContractType,
+				Info: data
 			};
 		});
 	}
@@ -268,6 +299,8 @@ class EX extends EXCHANGE {
 					Price: N.parse(p.price),
 					Type: p.side === 'BUY' ? 'Long' : 'Short',
 					ContractType: p.product_code,
+					Currency: this.options.Currency,
+					BaseCurrency: this.options.BaseCurrency,
 					Info: p
 				};
 				return re;
@@ -287,9 +320,11 @@ class EX extends EXCHANGE {
 		let positions = await this.GetPosition();
 		let re = {
 			Amount: 0,
-			ContractType: this.symbol,
+			ContractType: this.options.ContractType,
 			Price: 0,
-			MarginLevel: 0	
+			MarginLevel: 0,
+			Currency: this.options.Currency,
+			BaseCurrency: this.options.BaseCurrency
 		};
 
 		positions.map( p => {
@@ -318,6 +353,8 @@ class EX extends EXCHANGE {
 			FrozenAmount: 0,
 			Price: 0,
 			ContractType: '',
+			Currency: this.options.Currency,
+			BaseCurrency: this.options.BaseCurrency,
 			Info: []
 		};
 		arr.map(p => {
@@ -351,35 +388,11 @@ class EX extends EXCHANGE {
 			Stocks: 0,
 			FrozenStocks: 0,
 			MarginLevel: info.keep_rate > 0 ? (N(1).div(info.keep_rate).multiply(this.options.MarginLevel) * 1) : 0,
+			Currency: this.options.Currency,
+			BaseCurrency: this.options.BaseCurrency,
+			ContractType: this.options.ContractType,
 			Info: info
 		};
-
-		// return this.rest.GetAccount().then(data => {
-		// 	console.log(data);
-		// 	if (data && data.length > 0) {
-		// 		let re = {
-		// 			Balance: null,
-		// 			FrozenBalance: 0,
-		// 			Stocks: null,
-		// 			FrozenStocks: 0
-		// 		};
-		// 		data.map(r => {
-		// 			if (r.currency_code === this.Currency) {
-		// 				re.Stocks = N.parse(r.amount);
-		// 			} else if (r.currency_code === 'JPY') {
-		// 				re.Balance = N.parse(r.amount);
-		// 			}
-		// 		});
-
-		// 		if (re.Balance === null || re.FrozenBalance === null || re.Stocks === null || re.FrozenStocks === null) {
-		// 			throw new Error(this.GetName() + 'GetAccount returns error: ' + JSON.stringify(data));
-		// 		}
-
-		// 		return re;
-		// 	} else {
-		// 		throw new Error(this.GetName() + 'GetAccount return error: ' + JSON.stringify(data));
-		// 	}
-		// });
 	}
 
 	GetOrders() {
@@ -414,6 +427,8 @@ class EX extends EXCHANGE {
 			Time: moment(o.child_order_date).format('x') * 1,
 			Status: this._order_status(o.child_order_state),
 			ContractType: o.product_code,
+			Currency: this.options.Currency,
+			BaseCurrency: this.options.BaseCurrency,
 			Info: o
 		};
 	}
@@ -482,4 +497,4 @@ class EX extends EXCHANGE {
 }
 
 
-module.exports = EX;
+module.exports = BITFLYER_FX;

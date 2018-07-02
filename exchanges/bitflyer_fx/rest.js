@@ -1,21 +1,19 @@
 const fetch = require('node-fetch');
-const N = require('precise-number');
 const R = require('ramda');
 const debug = require('debug')('exchange:bitflyer:rest');
-const wait = require('delay');
 const crypto = require('crypto');
 const urlencode = require('urlencode-for-php');
 const ExError = require('../../lib/error');
 const ErrorCode = require('../../lib/error-code');
+const agent = require('../../lib/agent');
 
-class REST {
+class BITFLYER_FX_REST {
 
 	constructor(options) {
 		this.key = options.Key;
 		this.secret = options.Secret;
-		if (!options.Currency) options.Currency = 'BTC';
-		if (!options.BaseCurrency) options.BaseCurrency = 'JPY';
 		this.symbol = 'FX_' + options.Currency + '_' + options.BaseCurrency;
+		this.options = options;
 	}
 
 	fetch(url, params, method, allowEmptyResponse = false) {
@@ -46,7 +44,8 @@ class REST {
 				'ACCESS-TIMESTAMP': timestamp,
 				'ACCESS-SIGN': sign,
 				'Content-Type': 'application/json'
-			}
+			},
+			agent: agent.https
 		};
 
 		if (body) options.body = body;
@@ -165,12 +164,15 @@ class REST {
 			}
 
 			return Promise.resolve({
-				Asks: R.sort( R.descend( R.prop('Price') ), asks),
-				Bids: R.sort( R.descend( R.prop('Price') ), bids)
+				Asks: R.sort( R.ascend( R.prop('Price') ), asks),
+				Bids: R.sort( R.descend( R.prop('Price') ), bids),
+				Currency: this.options.Currency,
+				BaseCurrency: this.options.BaseCurrency,
+				ContractType: this.options.ContractType
 			});
 		});
 	}
 }
 
 
-module.exports = REST;
+module.exports = BITFLYER_FX_REST;

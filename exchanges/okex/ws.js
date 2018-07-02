@@ -6,7 +6,7 @@ const { md5 }  = require('utility');
 const Events = require('events');
 const clor = require('clor');
 
-class ZB_WS extends Events {
+class OKEX_WS extends Events {
 	constructor(options) {
 		super();
 		this.options = options;
@@ -275,4 +275,4 @@ function stringifyTookexFormat(obj) {
 	return formattedObject;
 }
 
-module.exports = ZB_WS;
+module.exports = OKEX_WS;

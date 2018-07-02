@@ -136,6 +136,11 @@ class OKEX_REST {
 		});
 	}
 
+	GetPublicTrades(Currency, BaseCurrency, since) {
+		let extra = since ? '&since=' + since : '';
+		return this.fetch('trades.do?symbol=' + this._getSymbol(Currency, BaseCurrency) + extra, null, 'GET');
+	}
+
 	async CancelOrder(orderId, Currency, BaseCurrency) {
 		await this.cancelRateLimiter.wait();
 		return this.fetch('cancel_order.do', {

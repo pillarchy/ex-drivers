@@ -10,7 +10,7 @@ let ex = new EX({
 	SnapshotMode: false,
 	onDepth: (depth) => {
 		// console.log('on depth');
-		console.log(depth);
+		console.log('depth', depth);
 	}
 });
 
@@ -27,11 +27,11 @@ describe('test Bitflyer', function() {
 	// 
 	
 
-	it('should get order', () => ex.GetOrder('JRF20180620-183753-349466').then(log));
+	// it('should get order', () => ex.GetOrder('JRF20180620-183753-349466').then(log));
 
-	it('should get account', () => ex.GetAccount().then(log));
+	// it('should get account', () => ex.GetAccount().then(log));
 
-	it('should get position', () => ex.GetNetPosition().then(log));
+	// it('should get position', () => ex.GetNetPosition().then(log));
 
 	// it('should get collateral', () => ex.GetCollateral().then(log));
 
