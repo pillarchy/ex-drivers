@@ -2,9 +2,9 @@ const EXCHANGE_REST = require('./rest.js');
 const EXCHANGE_WS = require('./ws.js');
 const N = require('precise-number');
 const { ok } = require('assert');
-const DelayTrigger = require('../../lib/delay-trigger.js');
 const EXCHANGE = require('../exchange.js');
-
+const ExError = require('../../lib/error');
+const ErrorCode = require('../../lib/error-code');
 
 class OKEX extends EXCHANGE {
 	constructor(options) {
@@ -14,95 +14,52 @@ class OKEX extends EXCHANGE {
 				Maker: 0.002,
 				Taker: 0.002
 			},
-			RateLimit: 10,
-			Decimals: 8,
-			StockDecimals: 3,
-			MinTradeStocks: 0.0000001
+			RateLimit: 10
 		}, options);
 		super(options);
 
-		this.Currency = options.Currency;
-		this.BaseCurrency = options.BaseCurrency;
-		
 		this.rest = new EXCHANGE_REST(this.options);
 	
 		if (options.isWS) {
-			let wsOptions = Object.assign({}, options);
-			this.delayTrigger = new DelayTrigger(300);
-			if (options.onAccountChange) {
-				wsOptions.onAccountChange = this.onAccountChange.bind(this);
-				this.delayTrigger.on('accountChange', data => {
-					options.onAccountChange(data);
-				});
-			}
-			if (options.onTrade) wsOptions.onTrade = this.onTrade.bind(this);
-			this.ws = new EXCHANGE_WS(wsOptions);
-		}
-
-		this.buildCache().catch(err => {
-			console.error('okex build websocket cache failed:', err);
-			process.exit();
-		});
-	}
-
-	async buildCache() {
-		if (this.options.isWS && this.options.onAccountChange) {
-			this.wsAccountCache = await this.GetAccount();
-		}
-	}
-
-	async onAccountChange(key, value) {
-		if (!this.wsAccountCache) {
-			await this.buildCache();
-		}
-		this.wsAccountCache[key] = value;
-		this.delayTrigger.trigger('accountChange', this.wsAccountCache);
-	}
-
-	onTrade(o) {
-		/*
-		{ symbol: 'eth_btc',
-		  orderId: 423541657,
-		  unTrade: '0.0',
-		  tradeUnitPrice: '0.05615070',
-		  tradeAmount: '0.001000',
-		  createdDate: '1522906129000',
-		  completedTradeAmount: '0.001000',
-		  averagePrice: '0.05600000',
-		  tradePrice: '0.000056',
-		  tradeType: 'buy',
-		  status: 2 }
-		 */
-		if (o && this.options.onTrade) {
-			this.options.onTrade({
-				Id: o.orderId,
-				Price: N.parse(o.tradePrice),
-				AvgPrice: N.parse(o.averagePrice),
-				Amount: N.parse(o.tradeAmount),
-				DealAmount: N.parse(o.completedTradeAmount),
-				Status: this._order_status(o.status),
-				Type: this._order_type(o.tradeType),
-				LeftAmount: N.parse(o.unTrade),
-				UnitPrice: N.parse(o.tradeUnitPrice),
-				Time: N.parse(o.createdDate)
+			this.ws = new EXCHANGE_WS(options);
+			this.ws.on('connect', () => {
+				this.wsReady = true;
+			});
+			this.ws.on('close', () => {
+				this.wsReady = false;
 			});
 		}
 	}
 
-	waitUntilWSReady() {
-		if (!this.options.isWS) return true;
-		return this.ws.waitUntilWSReady();	
+	async Subscribe(currency, baseCurrency, type) {
+		if (!this.options.isWS) throw new Error('is not websocket mode');
+		if (['Depth', 'PublicTrades', 'Ticker'].indexOf(type) === -1) {
+			throw new Error('unkown subscription type: ' + type);
+		}
+
+		if (type === 'Depth' && !this.options.onDepth) throw new Error('no onDepth callback');
+		if (type === 'Ticker' && !this.options.onTicker) throw new Error('no onTicker callback');
+		if (type === 'PublicTrades' && !this.options.onPublicTrades) throw new Error('no onPublicTrades callback');
+
+		try {
+			await this.waitUntilWSReady();
+			await this.ws.addSubscription(currency, baseCurrency, type);
+		} catch (err) {
+			console.error(this.GetName() + ` Subscribe got error:`, err);
+			throw err;
+		}
 	}
 
-	GetAccount() {
+	GetAccount(Currency, BaseCurrency) {
 		return this.rest.GetAccount().then( data => {
-			let base = this.options.BaseCurrency.toLowerCase();
-			let currency = this.options.Currency.toLowerCase();
+			let base = (BaseCurrency || this.options.BaseCurrency).toLowerCase();
+			let currency = (Currency || this.options.Currency).toLowerCase();
 			return {
 				Balance: N.parse(data.info.funds.free[base]),
 				FrozenBalance: N.parse(data.info.funds.freezed[base]),
 				Stocks: N.parse(data.info.funds.free[currency]),
 				FrozenStocks: N.parse(data.info.funds.freezed[currency]),
+				...this.rest._parse_ch(this.rest._getSymbol(Currency, BaseCurrency)),
 				Info: data.info
 			};
 		});
@@ -143,12 +100,12 @@ class OKEX extends EXCHANGE {
 		});
 	}
 
-	GetTicker() {
-		return this.rest.GetTicker();
+	GetTicker(Currency, BaseCurrency) {
+		return this.rest.GetTicker(Currency, BaseCurrency);
 	}
 
-	GetOrder(orderId) {
-		return this.rest.GetOrder(orderId).then(data => {
+	GetOrder(orderId, Currency, BaseCurrency) {
+		return this.rest.GetOrder(orderId, Currency, BaseCurrency).then(data => {
 			let orders = [];
 			if (data && data.orders && data.orders.length > 0) {
 				data.orders.map(o => {
@@ -159,7 +116,10 @@ class OKEX extends EXCHANGE {
 						DealAmount: N.parse(o.deal_amount),
 						Status: this._order_status(o.status),
 						Type: this._order_type(o.type),
-						AvgPrice: N.parse(o.avg_price)
+						AvgPrice: N.parse(o.avg_price),
+						Time: N.parse(o.create_date),
+						...this.rest._parse_ch(this.rest._getSymbol(Currency, BaseCurrency)),
+						Info: o
 					});
 				});
 			}
@@ -167,7 +127,7 @@ class OKEX extends EXCHANGE {
 				if (orders.length > 0) {
 					orders = orders[0];
 				} else {
-					throw orderId + ' 订单不存在';
+					throw new ExError(ErrorCode.ORDER_NOT_FOUND,  `okex order(${orderId}) not found`);
 				}
 			}
 			return Promise.resolve(orders);
@@ -177,8 +137,8 @@ class OKEX extends EXCHANGE {
 	/**
 	 * get finished order history
 	 */
-	async GetTrades(page = 1) {
-		let data = await this.rest.GetTrades(page);
+	async GetTrades(Currency, BaseCurrency, page = 1) {
+		let data = await this.rest.GetTrades(Currency, BaseCurrency, page);
 		let trades = [];
 		if (data && data.orders) {
 			data.orders.map(o => {
@@ -191,6 +151,7 @@ class OKEX extends EXCHANGE {
 					Status: this._order_status(o.status),
 					Type: this._order_type(o.type),
 					AvgPrice: N.parse(o.avg_price),
+					...this.rest._parse_ch(o.symbol),
 					Info: o
 				});
 			});
@@ -198,12 +159,12 @@ class OKEX extends EXCHANGE {
 		return trades.filter(o => o.DealAmount > 0);
 	}
 
-	Buy(price, amount) {
+	Trade(type, price, amount, Currency, BaseCurrency) {
 		ok( amount > 0, 'amount should greater than 0');
-		price = N(price).round(this.options.Decimals);
-		amount = N(amount).floor(this.options.StockDecimals);
-		console.log(this.GetName(), 'Buy', price, amount);
-		return this.rest.Buy(price, amount).then( r => {
+		if (this.options.Decimals) price = N(price).round(this.options.Decimals);
+		if (this.options.StockDecimals) amount = N(amount).floor(this.options.StockDecimals);
+		console.log(this.GetName(), type, price, amount, Currency || this.options.Currency, BaseCurrency || this.options.BaseCurrency);
+		return this.rest.Trade(type, price, amount, Currency, BaseCurrency).then( r => {
 			if (r && r.result && r.order_id) {
 				return r.order_id;
 			} else {
@@ -213,22 +174,16 @@ class OKEX extends EXCHANGE {
 		});
 	}
 
-	Sell(price, amount) {
-		ok( amount > 0, 'amount should greater than 0');
-		price = N(price).round(this.options.Decimals);
-		amount = N(amount).floor(this.options.StockDecimals);
-		console.log(this.GetName(), 'Sell', price, amount);
-		return this.rest.Sell(price, amount).then( r => {
-			if (r && r.result && r.order_id) {
-				return r.order_id;
-			} else {
-				throw new Error(r);
-			}
-		});
+	Buy(...args) {
+		return this.Trade('Buy', ...args);
 	}
 
-	CancelOrder(orderId) {
-		return this.rest.CancelOrder(orderId).then(result => {
+	Sell(...args) {
+		return this.Trade('Sell', ...args);	
+	}
+
+	CancelOrder(orderId, Currency, BaseCurrency) {
+		return this.rest.CancelOrder(orderId, Currency, BaseCurrency).then(result => {
 			if (result && (result.result === true || result.result === 'true')) return true;
 			if (result && result.error_code === 1050) return true;
 			if (result && result.error_code === 1009) return true;
@@ -236,12 +191,12 @@ class OKEX extends EXCHANGE {
 		});
 	}
 
-	CancelPendingOrders() {
+	CancelPendingOrders(Currency, BaseCurrency) {
 		console.log('cancelling pending orders...');
-		return this.GetOrders().then( orders => {
+		return this.GetOrders(Currency, BaseCurrency).then( orders => {
 			console.log('cancelling', orders.length, 'orders');
 			return Promise.all(orders.map( o => {
-				return this.CancelOrder(o.Id);
+				return this.CancelOrder(o.Id, Currency, BaseCurrency);
 			})).then( results => {
 				console.log(results);
 				return true;
@@ -249,22 +204,23 @@ class OKEX extends EXCHANGE {
 		});
 	}
 
-	GetOrders() {
-		return this.GetOrder(-1);
+	GetOrders(Currency, BaseCurrency) {
+		return this.GetOrder(-1, Currency, BaseCurrency);
 	}
 
-	GetDepth(size, merge) {
-		return this.rest.GetDepth(size, merge);
+	GetDepth(Currency, BaseCurrency, size, merge) {
+		return this.rest.GetDepth(Currency, BaseCurrency, size, merge);
 	}
 
 	_order_status( status ) {
-		//'-1:已撤销   0:未成交 1:部分成交 2:完全成交 4:撤单处理中';
+		//-1:已撤销  0:未成交  1:部分成交  2:完全成交 3:撤单处理中
 		status = status.toString();
 		let arr = {
 			'-1':'Cancelled',
 			'0': 'Pending',
 			'1': 'Partial',
 			'2': 'Closed',
+			'3': 'Pending',
 			'4': 'Pending'
 		};
 		return arr[status];
