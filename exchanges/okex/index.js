@@ -159,9 +159,6 @@ class OKEX extends EXCHANGE {
 		return trades.filter(o => o.DealAmount > 0);
 	}
 
-	/**
-	 * get finished order history
-	 */
 	async GetPublicTrades(Currency, BaseCurrency, since) {
 		let data = await this.rest.GetPublicTrades(Currency, BaseCurrency, since);
 		let trades = [];

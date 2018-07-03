@@ -313,6 +313,15 @@ class HUOBI_REST {
 		});
 	}
 
+	GetPublicTrades(Currency, BaseCurrency, size = 600) {
+		return this.get('/market/history/trade', {
+			symbol: this._getSymbol(Currency, BaseCurrency),
+			size
+		}).then(data => {
+			return data && data.data ? data.data : [];
+		});
+	}
+
 	CancelOrder(orderId) {
 		return this.post('/v1/order/orders/' + orderId + '/submitcancel').then(r => {
 			// console.log(r);

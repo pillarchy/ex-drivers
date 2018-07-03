@@ -185,6 +185,29 @@ class HUOBI extends EXCHANGE {
 		});
 	}
 
+	async GetPublicTrades(Currency, BaseCurrency, size = 600) {
+		let data = await this.rest.GetPublicTrades(Currency, BaseCurrency, size);
+		let trades = [], info = this.rest._parse_ch(this.rest._getSymbol(Currency, BaseCurrency));
+		if (data && data.length > 0) {
+			data.map(o => {
+				let { id, ts, data: arr } = o;
+				if (arr && arr.length > 0) {
+					arr.map(o => {
+						trades.push({
+							Id: id,
+							Time: N.parse(ts),
+							Price: N.parse(o.price),
+							Amount: N.parse(o.amount),
+							Type: o.direction === 'sell' ? 'Sell' : 'Buy',
+							...info
+						});
+					});
+				}
+			});
+		};
+		return trades;
+	}
+
 	_parse_time(t) {
 		t = t.toString();
 		let ms = t.match(/(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})/);
