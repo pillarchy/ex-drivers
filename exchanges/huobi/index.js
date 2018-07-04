@@ -189,6 +189,7 @@ class HUOBI extends EXCHANGE {
 		let data = await this.rest.GetPublicTrades(Currency, BaseCurrency, size);
 		let trades = [], info = this.rest._parse_ch(this.rest._getSymbol(Currency, BaseCurrency));
 		if (data && data.length > 0) {
+			data.reverse();
 			data.map(o => {
 				let { id, ts, data: arr } = o;
 				if (arr && arr.length > 0) {
