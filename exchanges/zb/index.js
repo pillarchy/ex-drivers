@@ -276,6 +276,7 @@ class ZB extends EXCHANGE {
 			Price: N.parse(o.price),
 			Amount: N.parse(o.total_amount),
 			DealAmount: N.parse(o.trade_amount),
+			AvgPrice: o.trade_money / o.trade_amount,
 			Type: (o.type && o.type * 1 === 1) ? 'Buy' : 'Sell',
 			Time: N.parse(o.trade_date),
 			Status: _order_status(o.status * 1),
