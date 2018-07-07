@@ -1,5 +1,5 @@
 const config = require('../../accounts.config.json');
-const EX = require('./index.js');
+const { BITFLYER_FX: EX } = require('../../index.js');
 const wait = require('delay');
 
 let ex = new EX({

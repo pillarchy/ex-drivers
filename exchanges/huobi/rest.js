@@ -381,6 +381,9 @@ class HUOBI_REST {
 	Trade(type, price, amount, Currency, BaseCurrency) {
 		let __type = price === -1 ? 'market' : 'limit';
 		let _type = `${type}-${__type}`.toLowerCase();
+		if (this.options.MakerMode && price !== -1) {
+			_type += '-maker';
+		}
 		return this._create_order(_type, price, amount, Currency, BaseCurrency);
 	}
 
