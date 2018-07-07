@@ -53,6 +53,7 @@ class OKEX_FUTURE_WS extends Events {
 			this.subscriptionCommands.map(cmd => {
 				this.ws.send(cmd);
 			});
+			this.emit('connect');
 		});
 
 		this.ws.on('message', (data) => {
@@ -116,12 +117,11 @@ class OKEX_FUTURE_WS extends Events {
 
 			let { channel, data } = message;
 			if (!channel || !data) return;
-
-			if (channel.match(/\_ticker$/)) {
+			if (channel.match(/\_ticker\_/)) {
 				this.onTicker(message);
-			} else if (channel.match(/^ok\_sub\_spot\_.+?\_depth(\_\d+)?$/)) {
+			} else if (channel.match(/^ok\_sub\_futureusd\_.+?\_depth/)) {
 				this.onDepth(message);
-			} else if (channel.match(/^ok\_sub\_spot\_.+?\_deals/)) {
+			} else if (channel.match(/^ok\_sub\_futureusd\_.+?\_trade/)) {
 				this.onPublicTrades(message);
 			}
 		});
@@ -133,15 +133,18 @@ class OKEX_FUTURE_WS extends Events {
 		this.lastPong = Date.now();
 	}
 
-	addSubscription(Currency, BaseCurrency, type) {
+	addSubscription(Currency, BaseCurrency, type, ContractType) {
+		if (!Currency) Currency = this.options.Currency;
+		if (!BaseCurrency) BaseCurrency = this.options.BaseCurrency;
+		if (!ContractType) ContractType = this.options.DefaultContactType;
+
 		let channel = '';
-		let symbol = String(Currency + '_' + BaseCurrency).toLowerCase();
 		if (type === 'Ticker') {
-			channel = `ok_sub_futureusd_${symbol}_ticker`;
+			channel = `ok_sub_futureusd_${Currency}_ticker_${ContractType}`.toLowerCase();
 		} else if (type === 'Depth') {
-			channel = `ok_sub_futureusd_${symbol}_depth_20`;
+			channel = `ok_sub_futureusd_${Currency}_depth_${ContractType}_20`.toLowerCase();
 		} else if (type === 'PublicTrades') {
-			channel = `ok_sub_futureusd_${symbol}_deals`;
+			channel = `ok_sub_futureusd_${Currency}_trade_${ContractType}`.toLowerCase();
 		}
 		
 		if (!channel) throw new Error('unkown subscription type: ' + type);
@@ -185,17 +188,21 @@ class OKEX_FUTURE_WS extends Events {
 
 	_parse_ch(ch) {
 		if (!ch) ch = '';
-		ch = ch.replace(/^ok\_sub\_spot\_/i, '').replace(/(\_ticker|\_depth|\_depth\_\d+|\_deals)$/ig, '');
-		let ms = ch.match(/^([0-9a-z]+)\_([0-9a-z]+)$/);
-		if (ms && ms[1] && ms[2]) {
+		ch = ch.replace(/^ok_sub_future/i, '');
+		let ms = ch.match(/^usd\_([0-9a-z]+)/);
+		let ms2 = ch.match(/(quarter|this_week|nex_week)/);
+		let ContractType = ms2 && ms2[1] ? ms2[1] : this.options.DefaultContactType;
+		if (ms && ms[1]) {
 			return {
 				Currency: String(ms[1]).toUpperCase(),
-				BaseCurrency: String(ms[2]).toUpperCase()
+				BaseCurrency: 'USD',
+				ContractType
 			};
 		} else {
 			return {
 				Currency: this.options.Currency,
-				BaseCurrency: this.options.BaseCurrency
+				BaseCurrency: this.options.BaseCurrency,
+				ContractType
 			};
 		}
 	}

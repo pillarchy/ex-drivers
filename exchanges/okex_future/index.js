@@ -2,7 +2,6 @@ const EXCHANGE_REST = require('./rest.js');
 const EXCHANGE_WS = require('./ws.js');
 const N = require('precise-number');
 const { ok } = require('assert');
-const wait = require('delay');
 const fetch = require('node-fetch');
 const EXCHANGE = require('../exchange.js');
 
@@ -31,8 +30,18 @@ class OKEX_FUTURE extends EXCHANGE {
 
 		this._check_contract_type(options.DefaultContactType);
 
+		if (this.options.BaseCurrency !== 'USD') throw new Error('okex future BaseCurrency should be USD');
+
 		this.options = options;
-		if (options.isWS) this.ws = new EXCHANGE_WS(options);
+		if (options.isWS) {
+			this.ws = new EXCHANGE_WS(options);
+			this.ws.on('connect', () => {
+				this.wsReady = true;
+			});
+			this.ws.on('close', () => {
+				this.wsReady = false;
+			});
+		}
 		this.rest = new EXCHANGE_REST(options);
 	}
 
@@ -81,14 +90,25 @@ class OKEX_FUTURE extends EXCHANGE {
 		};
 	}
 
-	async waitUntilWSReady() {
-		let startTime = Date.now();
-		while (true) {
-			if (this.ws.wsReady) break;
-			if (Date.now() - startTime > 10000) throw new Error('websocket ready timeout');
-			await wait(100);
+	async Subscribe(currency, baseCurrency, type, contractType) {
+		if (!this.options.isWS) throw new Error('is not websocket mode');
+		if (['Depth', 'PublicTrades', 'Ticker'].indexOf(type) === -1) {
+			throw new Error('unkown subscription type: ' + type);
 		}
-		return true;
+
+		if (contractType) this._check_contract_type(contractType);
+
+		if (type === 'Depth' && !this.options.onDepth) throw new Error('no onDepth callback');
+		if (type === 'Ticker' && !this.options.onTicker) throw new Error('no onTicker callback');
+		if (type === 'PublicTrades' && !this.options.onPublicTrades) throw new Error('no onPublicTrades callback');
+
+		try {
+			await this.waitUntilWSReady();
+			await this.ws.addSubscription(currency, baseCurrency, type, contractType);
+		} catch (err) {
+			console.error(this.GetName() + ` Subscribe got error:`, err);
+			throw err;
+		}
 	}
 
 	API(url, params, method) {
@@ -105,25 +125,8 @@ class OKEX_FUTURE extends EXCHANGE {
 		return this.rest;
 	}
 
-	GetAccount() {
-		return this.getHandler().GetAccount().then( data => {
-			let currency = this.options.Currency.toLowerCase();
-			let info = data.info[currency];
-			let re = {
-				Balance: N.parse(info.balance),
-				Value: N.parse(info.rights),
-				this_week: null,
-				next_week: null,
-				quarter: null,
-				Info: data
-			};
-			if (info.contracts) {
-				info.contracts.map(c => {
-					re[c.contract_type] = c;
-				});
-			}
-			return re;
-		});
+	GetAccount(...args) {
+		return this.rest.GetAccount(...args);
 	}
 
 	GetPosition() {
@@ -193,8 +196,8 @@ class OKEX_FUTURE extends EXCHANGE {
 		});
 	}
 
-	GetTicker() {
-		return this.rest.GetTicker();
+	GetTicker(...args) {
+		return this.rest.GetTicker(...args);
 	}
 
 	GetOrder(orderId, contract_type) {
@@ -298,8 +301,8 @@ class OKEX_FUTURE extends EXCHANGE {
 		});
 	}
 
-	GetDepth(contract_type, size, merge) {
-		return this.rest.GetDepth(contract_type, size, merge);
+	GetDepth(...args) {
+		return this.rest.GetDepth(...args);
 	}
 
 	async GetAvgPriceShift(contract_type) {

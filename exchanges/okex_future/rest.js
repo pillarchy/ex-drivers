@@ -3,7 +3,7 @@ const fetch = require('node-fetch');
 const N = require('precise-number');
 const R = require('ramda');
 const debug = require('debug')('exchange:okex:rest');
-const wait = require('delay');
+const agent = require('../../lib/agent');
 
 class OKEX {
 
@@ -38,7 +38,8 @@ class OKEX {
 			headers: {
 				'Content-Type':'application/x-www-form-urlencoded',
 				'Content-Length': body.length
-			}
+			},
+			agent: agent.https
 		};
 
 		if (body) options.body = body;
@@ -70,8 +71,21 @@ class OKEX {
 		});
 	}
 
-	GetTicker(contract_type) {
-		return this.fetch(`future_ticker.do?symbol=${this.symbol}&contract_type=${contract_type || this.options.DefaultContactType}`, null, 'GET').then(data => {
+	_getSymbol(Currency, BaseCurrency) {
+		if (!Currency) Currency = this.options.Currency;
+		if (!BaseCurrency) BaseCurrency = this.options.BaseCurrency;
+		return Currency.toLowerCase() + '_' + BaseCurrency.toLowerCase();
+	}
+
+	_parseSymbol(Currency, BaseCurrency, ContractType) {
+		if (!Currency) Currency = this.options.Currency;
+		if (!BaseCurrency) BaseCurrency = this.options.BaseCurrency;
+		if (!ContractType) ContractType = this.options.DefaultContactType;
+		return { Currency, BaseCurrency, ContractType };
+	}
+
+	GetTicker(Currency, BaseCurrency, contract_type) {
+		return this.fetch(`future_ticker.do?symbol=${this._getSymbol(Currency, BaseCurrency)}&contract_type=${contract_type || this.options.DefaultContactType}`, null, 'GET').then(data => {
 			return Promise.resolve({
 				High: N.parse(data.ticker.high),
 				Low: N.parse(data.ticker.low),
@@ -81,14 +95,41 @@ class OKEX {
 				Volume: N.parse(data.ticker.vol),
 				Time: N.parse(data.date) * 1000,
 				ContractId: data.ticker.contract_id + '',
-				UnitAmount: N.parse(data.ticker.unit_amount)
+				UnitAmount: N.parse(data.ticker.unit_amount),
+				...this._parseSymbol(Currency, BaseCurrency, contract_type)
 			});
 		});
 	}
 
-	GetAccount() {
+	GetAccount(Currency, BaseCurrency) {
+		if (!Currency) Currency = this.options.Currency;
+		if (!BaseCurrency) BaseCurrency = this.options.BaseCurrency;
 		let path = this.options.ContractMode === 'Seperate' ? 'future_userinfo_4fix.do' : 'future_userinfo.do';
-		return this.fetch(path);
+		return this.fetch(path).then(data => {
+			let currency = Currency.toLowerCase();
+			let info = data.info[currency];
+			let re = {
+				Balance: 0,
+				FrozenBalance: 0,
+				Stocks: N.parse(info.balance),
+				FrozenStocks: 0,
+				Value: N.parse(info.rights),
+				this_week: null,
+				next_week: null,
+				quarter: null,
+				Currency,
+				BaseCurrency,
+				Info: data.info
+			};
+
+			if (info.contracts) {
+				info.contracts.map(c => {
+					re.FrozenStocks = N(re.FrozenStocks).add(c.bond) * 1;
+					re[c.contract_type] = c;
+				});
+			}
+			return re;
+		});
 	}
 
 	GetPosition(contract_type) {
@@ -142,12 +183,12 @@ class OKEX {
 		return this.fetch('future_trade.do', params);
 	}
 
-	GetDepth(contract_type, size, merge) {
-		let params = ['symbol=' + this.symbol];
+	GetDepth(Currency, BaseCurrency, ContractType, size, merge) {
+		let params = ['symbol=' + this._getSymbol(Currency, BaseCurrency)];
 		if (!size) size = 30;
 		if (size) params.push('size=' + size);
 		if (merge) params.push('merge=' + merge);
-		params.push('contract_type=' + (contract_type || this.options.DefaultContactType));
+		params.push('contract_type=' + (ContractType || this.options.DefaultContactType));
 
 		return this.fetch('future_depth.do?' + params.join('&'), null, 'GET').then(data => {
 
@@ -181,8 +222,9 @@ class OKEX {
 			});
 
 			return Promise.resolve({
-				Asks: R.sort( R.descend( R.prop('Price') ), asks),
-				Bids: R.sort( R.descend( R.prop('Price') ), bids)
+				Asks: R.sort( R.ascend( R.prop('Price') ), asks),
+				Bids: R.sort( R.descend( R.prop('Price') ), bids),
+				...this._parseSymbol(Currency, BaseCurrency, ContractType)
 			});
 		});
 	}
