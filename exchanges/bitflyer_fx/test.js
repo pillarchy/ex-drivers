@@ -10,7 +10,7 @@ let ex = new EX({
 	SnapshotMode: false,
 	onDepth: (depth) => {
 		// console.log('on depth');
-		console.log('depth', depth);
+		console.log('depth', depth.Asks.length, depth.Bids.length, depth.Asks[0].Price, depth.Bids[0].Price);
 	}
 });
 

@@ -2,12 +2,12 @@ const N = require('precise-number');
 const { ok } = require('assert');
 const R = require('ramda');
 const moment = require('moment');
-const WebSocket = require("rpc-websockets").Client;
 const REST = require('./rest.js');
 const EventEmitter = require('events');
 const EXCHANGE = require('../exchange.js');
 const ExError = require('../../lib/error');
 const ErrorCode = require('../../lib/error-code');
+const io = require('socket.io-client');
 
 class BITFLYER_FX extends EXCHANGE {
 	constructor(options) {
@@ -72,31 +72,27 @@ class BITFLYER_FX extends EXCHANGE {
 
 			this.wsReady = false;
 
-			this.ws = new WebSocket("wss://ws.lightstream.bitflyer.com/json-rpc");
+			this.ws = io("https://io.lightstream.bitflyer.com", { transports: ["websocket"] });
 
-			this.ws.on("open", () => {
+			let snapshotChannel = "lightning_board_snapshot_" + this.symbol;
+			let depthChannel = "lightning_board_" + this.symbol;
+			this.ws.on("connect", () => {
 				console.log('bitflyer_fx ws on open');
-				this.ws.call("subscribe", {
-					channel: "lightning_board_snapshot_" + this.symbol
-				});
+				this.ws.emit("subscribe", snapshotChannel);
 
 				if (!this.options.SnapshotMode) {
-					this.ws.call("subscribe", {
-						channel: "lightning_board_" + this.symbol
-					});
+					this.ws.emit("subscribe", depthChannel);
 				}
 			});
 
-			this.ws.on("channelMessage", notify => {
+			this.ws.on(snapshotChannel, notify => {
 				this.wsReady = true;
-				//console.log(notify);
-				if (notify.channel === 'lightning_board_snapshot_' + this.symbol) {
-					this.buildOrderBook(notify.message);
-				} else if (notify.channel === 'lightning_board_' + this.symbol) {
-					this.updateOrderBook(notify.message);
-				} else {
-					console.error('unkonwn event', notify);
-				}
+				this.buildOrderBook(notify);
+			});
+
+			this.ws.on(depthChannel, notify => {
+				this.wsReady = true;
+				this.updateOrderBook(notify);
 			});
 		} catch (err) {
 			console.error("new websocket error", err);
