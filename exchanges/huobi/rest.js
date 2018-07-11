@@ -328,7 +328,7 @@ class HUOBI_REST {
 			if (!r.data) this.error('can not cancel order:', orderId, r);
 			return true;
 		}).catch(err => {
-			console.error(err);
+			// console.error(err);
 			if (err && err.code === 'order-orderstate-error') {
 				console.log('cancel a cancelled order');
 				return true;
