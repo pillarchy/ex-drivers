@@ -121,7 +121,9 @@ class HUOBI extends EXCHANGE {
 			'buy-market': 'Buy',
 			'sell-market': 'Sell',
 			'buy-limit': 'Buy',
-			'sell-limit': 'Sell'
+			'sell-limit': 'Sell',
+			'sell-limit-maker': 'Sell',
+			'buy-limit-maker': 'Buy'
 		};
 
 		return {

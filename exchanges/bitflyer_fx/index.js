@@ -18,9 +18,9 @@ class BITFLYER_FX extends EXCHANGE {
 				Maker: 0,
 				Taker: 0
 			},
-			RateLimit: 10,
+			RateLimit: 3,
 			Decimals: 0,
-			StockDecimals: 3,
+			StockDecimals: 8,
 			MinTradeStocks: 0.01,
 			BaseCurrency: 'JPY',
 			Currency: 'BTC',
@@ -287,6 +287,10 @@ class BITFLYER_FX extends EXCHANGE {
 		     sfd: 0 } ]
 		 */
 		return this.rest.GetPosition().then(positions => {
+			if (!positions || !positions.map) {
+				console.log('bad positions', positions);
+				throw new Error('bad position data' + JSON.stringify(positions));
+			}
 			return positions.map(p => {
 				let re = {
 					Amount: N.parse(p.size),
@@ -375,7 +379,7 @@ class BITFLYER_FX extends EXCHANGE {
 		 */
 		let info = await this.rest.GetCollateral();
 		let total = info.collateral || 0;
-		let totalBalance = Math.floor(total / 0.8);
+		let totalBalance = total;//Math.floor(total / 0.8);
 		let usedBalance = Math.floor(info.require_collateral);
 
 		return {
@@ -462,15 +466,14 @@ class BITFLYER_FX extends EXCHANGE {
 		}
 	}
 
-	Trade(type, price, amount) {
+	Trade(type, price, amount, time_in_force, minute_to_expire) {
 		amount = N(amount).floor(this.options.StockDecimals);
-		price = N(price).floor(this.options.Decimals);
+		if (price !== -1) price = N(price).floor(this.options.Decimals);
 
 		ok( amount > 0, 'amount should greater than 0');
-		ok( price > 0, 'price should greater than 0');
 
-		console.log(this.GetName(), type, price, amount);
-		return this.rest.Trade(type, price, amount);
+		console.log(this.GetName(), type, price, amount, time_in_force || '', minute_to_expire || '');
+		return this.rest.Trade(type, price, amount, time_in_force, minute_to_expire);
 	}
 
 	Long(price, amount) {

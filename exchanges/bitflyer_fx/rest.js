@@ -106,7 +106,7 @@ class BITFLYER_FX_REST {
 		return this.fetch('/v1/me/getchildorders', params, 'GET');
 	}
 
-	Trade(type, price, amount) {
+	Trade(type, price, amount, time_in_force, minute_to_expire) {
 		let params = {
 			product_code: this.symbol,
 			child_order_type: "LIMIT",
@@ -114,6 +114,14 @@ class BITFLYER_FX_REST {
 			price,
 			size: amount
 		};
+		if (price === -1) {
+			params.child_order_type = 'MARKET';
+			delete params.price;
+		}
+		
+		if (time_in_force) params.time_in_force = time_in_force;
+		if (minute_to_expire) params.minute_to_expire = minute_to_expire;
+
 		return this.fetch('/v1/me/sendchildorder', params, 'POST').then(o => {
 			if (o && o.status === -205) throw new ExError(ErrorCode.INSUFFICIENT_BALANCE, JSON.stringify(o));
 			if (o && o.child_order_acceptance_id) return o.child_order_acceptance_id;
