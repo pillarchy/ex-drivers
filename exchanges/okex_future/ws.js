@@ -190,7 +190,7 @@ class OKEX_FUTURE_WS extends Events {
 		if (!ch) ch = '';
 		ch = ch.replace(/^ok_sub_future/i, '');
 		let ms = ch.match(/^usd\_([0-9a-z]+)/);
-		let ms2 = ch.match(/(quarter|this_week|nex_week)/);
+		let ms2 = ch.match(/(quarter|this_week|next_week)/);
 		let ContractType = ms2 && ms2[1] ? ms2[1] : this.options.DefaultContactType;
 		if (ms && ms[1]) {
 			return {
