@@ -121,7 +121,9 @@ class HUOBI extends EXCHANGE {
 			'buy-market': 'Buy',
 			'sell-market': 'Sell',
 			'buy-limit': 'Buy',
-			'sell-limit': 'Sell'
+			'sell-limit': 'Sell',
+			'sell-limit-maker': 'Sell',
+			'buy-limit-maker': 'Buy'
 		};
 
 		return {
@@ -183,6 +185,30 @@ class HUOBI extends EXCHANGE {
 		}).then(trades => {
 			return R.sort( R.ascend( R.prop('Time') ), trades);
 		});
+	}
+
+	async GetPublicTrades(Currency, BaseCurrency, size = 600) {
+		let data = await this.rest.GetPublicTrades(Currency, BaseCurrency, size);
+		let trades = [], info = this.rest._parse_ch(this.rest._getSymbol(Currency, BaseCurrency));
+		if (data && data.length > 0) {
+			data.reverse();
+			data.map(o => {
+				let { id, ts, data: arr } = o;
+				if (arr && arr.length > 0) {
+					arr.map(o => {
+						trades.push({
+							Id: id,
+							Time: N.parse(ts),
+							Price: N.parse(o.price),
+							Amount: N.parse(o.amount),
+							Type: o.direction === 'sell' ? 'Sell' : 'Buy',
+							...info
+						});
+					});
+				}
+			});
+		};
+		return trades;
 	}
 
 	_parse_time(t) {

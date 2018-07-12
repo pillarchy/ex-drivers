@@ -1,14 +1,7 @@
-/*
-* @Author: leosj
-* @Date:   2017-12-25 23:18:20
-* @Last Modified by:   leosj
-* @Last Modified time: 2017-12-26 21:56:00
-*/
 const fetch = require('node-fetch');
 const N = require('precise-number');
 const R = require('ramda');
 const crypto = require('crypto');
-const moment = require('moment');
 const debug = require('debug')('huobi:rest');
 const ExError = require('../../lib/error');
 const ErrorCode = require('../../lib/error-code');
@@ -320,13 +313,22 @@ class HUOBI_REST {
 		});
 	}
 
+	GetPublicTrades(Currency, BaseCurrency, size = 600) {
+		return this.get('/market/history/trade', {
+			symbol: this._getSymbol(Currency, BaseCurrency),
+			size
+		}).then(data => {
+			return data && data.data ? data.data : [];
+		});
+	}
+
 	CancelOrder(orderId) {
 		return this.post('/v1/order/orders/' + orderId + '/submitcancel').then(r => {
 			// console.log(r);
 			if (!r.data) this.error('can not cancel order:', orderId, r);
 			return true;
 		}).catch(err => {
-			console.error(err);
+			// console.error(err);
 			if (err && err.code === 'order-orderstate-error') {
 				console.log('cancel a cancelled order');
 				return true;
@@ -379,6 +381,9 @@ class HUOBI_REST {
 	Trade(type, price, amount, Currency, BaseCurrency) {
 		let __type = price === -1 ? 'market' : 'limit';
 		let _type = `${type}-${__type}`.toLowerCase();
+		if (this.options.MakerMode && price !== -1) {
+			_type += '-maker';
+		}
 		return this._create_order(_type, price, amount, Currency, BaseCurrency);
 	}
 

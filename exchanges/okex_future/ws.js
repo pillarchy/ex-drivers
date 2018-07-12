@@ -1,257 +1,285 @@
-const OKWS = require('./okex.ws.js');
-const Queue = require('../../lib/queue.js');
 const N = require('precise-number');
+const WebSocket = require('../../lib/auto-reconnect-ws.js');
+const moment = require('moment');
 const R = require('ramda');
-const wait = require('delay');
-const debug = require('debug')('okex:ws');
+const { md5 }  = require('utility');
+const Events = require('events');
+const clor = require('clor');
 
-class EXCHANGE {
-
+class OKEX_FUTURE_WS extends Events {
 	constructor(options) {
-
-		this.accountInfoQueue = new Queue(10000);
-		this.tradeQueue = new Queue(3000);
-		this.orderInfoQueue = new Queue(3000);
-		this.cancelOrderQueue = new Queue(3000);
-
+		super();
 		this.options = options;
 
-		if (!options.Currency) throw new Error('no Currency');
-		this.symbol = options.Currency.toLowerCase() + '_' + options.BaseCurrency.toLowerCase();
-		this.options.Symbol = this.symbol;
-		this.options.onConnect = () => {
-			debug('onConnect');
-			this.wsReady = true;
-		};
+		this.lastPingTime = Date.now();
 
-		this.ws = new OKWS(this.options);
+		this.symbol = this.options.Currency.toLowerCase() + '_' + this.options.BaseCurrency.toLowerCase();
 
-		this.ws.onConnect = options.onConnect;
+		this.ws = new WebSocket('wss://real.okex.com:10440/websocket/okexapi');
 
-		this.wsReady = false;
+		//remember subscription commands
+		this.subscriptionCommands = [];
 
-		let handlers = {};
+		let loginParams = {api_key: this.options.Key};
+		loginParams.sign = sign(loginParams, this.options.Secret);
+		this.subscriptionCommands.push(JSON.stringify({
+			event: 'login',
+			parameters: loginParams
+		}).replace(/\"/g, "'"));
 
 		if (this.options.onDepth) {
-			handlers[`ok_sub_futureusd_${this.options.Currency.toLowerCase()}_depth_${this.options.DefaultContactType.toLowerCase()}_20`] = (data, err) => {
-				this.onDepth(data, err);
-			};
+			this.subscriptionCommands.push(JSON.stringify({
+				event: 'addChannel',
+				channel: `ok_sub_futureusd_${this.options.Currency.toLowerCase()}_depth_${this.options.DefaultContactType.toLowerCase()}_20`
+			}).replace(/\"/g, "'"));
 		}
 
-		if (this.options.onIndex) {
-			handlers[`ok_sub_futureusd_${this.options.Currency.toLowerCase()}_index`] = (data, err) => {
-				this.onIndex(data, err);
-			};
+		if (this.options.onTicker) {
+			this.subscriptionCommands.push(JSON.stringify({
+				event: 'addChannel',
+				channel: `ok_sub_futureusd_${this.options.Currency.toLowerCase()}_ticker_${this.options.DefaultContactType.toLowerCase()}`
+			}).replace(/\"/g, "'"));
 		}
 
-		if (options.onAccountChange) {
-			handlers['ok_sub_futureusd_userinfo'] = (data, err) => {
-				this.onAccountChange(data, err);
-			};
+		if (this.options.onPublicTrades) {
+			this.subscriptionCommands.push(JSON.stringify({
+				event: 'addChannel',
+				channel: `ok_sub_futureusd_${this.options.Currency.toLowerCase()}_trade_${this.options.DefaultContactType.toLowerCase()}`
+			}).replace(/\"/g, "'"));
 		}
 
-		if (options.onTicker) {
-			handlers[`ok_sub_futureusd_${this.options.Currency.toLowerCase()}_ticker_${this.options.DefaultContactType.toLowerCase()}`] = (data, err) => {
-				this.onTicker(data, err);
-			};
-		}
+		this.wsReady = false;
+		this.ws.on('open', () => {
+			this.subscriptionCommands.map(cmd => {
+				this.ws.send(cmd);
+			});
+			this.emit('connect');
+		});
 
-		if (options.onPositionChange) {
-			handlers['ok_sub_futureusd_positions'] = (data, err) => {
-				this.onPositionChange(data, err);
-			};
-		}
+		this.ws.on('message', (data) => {
+			this.wsReady = true;
+			this.onMessage(data);
+		});
 
-		if (options.onTrade) {
-			handlers['ok_sub_futureusd_trades'] = (data, err) => {
-				this.onTrade(data, err);
-			};
-		}
+		this.ws.on('pong', t => {
+			this.wsReady = true;
+			if (this.options.onPong) {
+				this.options.onPong(t);
+			}
+		});
 
-		this.ws.subscribe(handlers);
+		this.ws.on('close', () => {
+			this.emit('close');
+			this.wsReady = false;
+		});
 
-		this.cb = options.onUpadte ? options.onUpadte : function() { };
+		this.ws.on('error', () => {
+			this.emit('close');
+			this.wsReady = false;
+		});
+
+		setInterval(() => {
+			if (this.wsReady) {
+				this.lastPingTime = Date.now();
+				this.ws.send("{'event':'ping'}");
+			}
+		}, 5000);
 	}
 
-	onTicker(data, err) {
+	onMessage(raw)  {
+		let messages = null;
+		try {
+			messages = JSON.parse(raw);
+		} catch (err) {
+			console.error('okex websocket message error: ' + raw);
+			return;
+		}
+		if (!messages) return;
+
+		if (messages && messages.event === 'pong') {
+			this.onPong();
+			return;
+		}
+
+		messages.forEach(message => {
+			if (message.channel === 'login') {
+				if (message.data && message.data.result) {
+					console.log(clor.green('okex websocket login success').toString());
+					this.wsReady = true;
+					this.emit('connect');
+				} else {
+					console.error(clor.red('okex websocket login faild').toString(), message);
+					process.exit();
+					return;
+				}
+				return;
+			}
+
+			let { channel, data } = message;
+			if (!channel || !data) return;
+			if (channel.match(/\_ticker\_/)) {
+				this.onTicker(message);
+			} else if (channel.match(/^ok\_sub\_futureusd\_.+?\_depth/)) {
+				this.onDepth(message);
+			} else if (channel.match(/^ok\_sub\_futureusd\_.+?\_trade/)) {
+				this.onPublicTrades(message);
+			}
+		});
+	}
+
+	onPong() {
+		let gap = Date.now() - this.lastPingTime;
+		console.log('okex websocket ping pong time:', gap + 'ms');
+		this.lastPong = Date.now();
+	}
+
+	addSubscription(Currency, BaseCurrency, type, ContractType) {
+		if (!Currency) Currency = this.options.Currency;
+		if (!BaseCurrency) BaseCurrency = this.options.BaseCurrency;
+		if (!ContractType) ContractType = this.options.DefaultContactType;
+
+		let channel = '';
+		if (type === 'Ticker') {
+			channel = `ok_sub_futureusd_${Currency}_ticker_${ContractType}`.toLowerCase();
+		} else if (type === 'Depth') {
+			channel = `ok_sub_futureusd_${Currency}_depth_${ContractType}_20`.toLowerCase();
+		} else if (type === 'PublicTrades') {
+			channel = `ok_sub_futureusd_${Currency}_trade_${ContractType}`.toLowerCase();
+		}
+		
+		if (!channel) throw new Error('unkown subscription type: ' + type);
+
+		let cmd = JSON.stringify({
+			event: 'addChannel',
+			channel
+		}).replace(/\"/g, "'");
+
+		this.ws.send(cmd);
+		this.subscriptionCommands.push(cmd);
+	}
+
+	onDepth(data) {
+		let { channel, data: {timestamp, asks, bids } } = data;
+		if (!asks || !bids || !channel || !timestamp) return;
+
+		asks = asks.map(pair => {
+			return {
+				Price: N.parse(pair[0]),
+				Amount: N.parse(pair[1])
+			};
+		});
+
+		bids = bids.map(pair => {
+			return {
+				Price: N.parse(pair[0]),
+				Amount: N.parse(pair[1])
+			};
+		});
+
+		let depth = {
+			Time: Math.round(timestamp * 1000),
+			Asks: R.sort( R.ascend( R.prop('Price') ), asks),
+			Bids: R.sort( R.descend( R.prop('Price') ), bids),
+			...this._parse_ch(channel)
+		};
+
+		this.options.onDepth(depth);
+	}
+
+	_parse_ch(ch) {
+		if (!ch) ch = '';
+		ch = ch.replace(/^ok_sub_future/i, '');
+		let ms = ch.match(/^usd\_([0-9a-z]+)/);
+		let ms2 = ch.match(/(quarter|this_week|nex_week)/);
+		let ContractType = ms2 && ms2[1] ? ms2[1] : this.options.DefaultContactType;
+		if (ms && ms[1]) {
+			return {
+				Currency: String(ms[1]).toUpperCase(),
+				BaseCurrency: 'USD',
+				ContractType
+			};
+		} else {
+			return {
+				Currency: this.options.Currency,
+				BaseCurrency: this.options.BaseCurrency,
+				ContractType
+			};
+		}
+	}
+
+	onTicker({channel, data}) {
+		if (!data || !channel) return;
+
 		/*
-		{ high: '7069',
-		  limitLow: '6861.11',
-		  vol: '10612960',
-		  last: '7042.32',
-		  low: '6329.66',
-		  buy: '7041.63',
-		  hold_amount: '1001328',
-		  sell: '7043.82',
-		  contractId: 201806290000034,
-		  unitAmount: '100',
-		  limitHigh: '7286.02' }
+		{ high: '0.05612832',
+		  vol: '128795.274296',
+		  last: '0.05586972',
+		  low: '0.05350554',
+		  buy: '0.0557892',
+		  change: '0.00090871',
+		  sell: '0.05595013',
+		  dayLow: '0.05350554',
+		  close: '0.05586972',
+		  dayHigh: '0.05612832',
+		  open: '0.05496101',
+		  timestamp: 1522904232875 }
 		 */
 		let re = {
-			Open: N.parse(data.last),
+			Open: N.parse(data.open),
 			High: N.parse(data.high),
 			Low: N.parse(data.low),
-			Close: N.parse(data.last),
+			Close: N.parse(data.close),
 			Buy: N.parse(data.buy),
 			Sell: N.parse(data.sell),
-			LimitHigh: N.parse(data.limitHigh),
-			LimitLow: N.parse(data.limitLow),
-			Volume: N.parse(data.vol)
+			Volume: N.parse(data.vol),
+			Time: N.parse(data.timestamp),
+			...this._parse_ch(channel),
+			Info: data
 		};
 		if (this.options.onTicker) {
 			this.options.onTicker(re);
 		}
 	}
 
-	onAccountChange(data) {
-		/*
-		全仓信息
-		balance(double): 账户余额
-		symbol(string)：币种
-		keep_deposit(double)：保证金
-		profit_real(double)：已实现盈亏
-		unit_amount(int)：合约价值
-		逐仓信息
-		balance(double):账户余额
-		available(double):合约可用
-		balance(double):合约余额
-		bond(double):固定保证金
-		contract_id(long):合约ID
-		contract_type(string):合约类别
-		freeze(double):冻结
-		profit(double):已实现盈亏
-		unprofit(double):未实现盈亏
-		rights(double):账户权益
-		 */
-		if (typeof this.options.onAccountChange === 'function' && data) {
-			let re = {
-				Balance: N.parse(data.balance),
-				Info: data
-			};
+	onPublicTrades(data) {
+		let { channel, data: trades } = data;
+		if (!channel || !trades || trades.length <= 0) return;
 
-			data.contracts.map(c => {
-				re.Balance = N(re.Balance).add(c.balance) * 1;
-			});
-
-			this.options.onAccountChange(re);
-		}
+		let baseTime = moment().format('YYYY-MM-DD') + ' ';
+		trades = trades.map(t => ({
+			Amount: N.parse(t[2]),
+			Price: N.parse(t[1]),
+			Type: t[4] === 'bid' ? 'Buy' : 'Sell',
+			Time: moment(baseTime + t[3]).format('x') * 1,
+			Id: t[0],
+			...this._parse_ch(channel)
+		}));
+		this.options.onPublicTrades(trades);
 	}
-
-	onPositionChange(data) {
-		if (data && typeof this.options.onPositionChange === 'function') {
-			/*
-			全仓说明
-			position(string): 仓位 1多仓 2空仓
-			contract_name(string): 合约名称
-			costprice(string): 开仓价格
-			bondfreez(string): 当前合约冻结保证金
-			avgprice(string): 开仓均价
-			contract_id(long): 合约id
-			position_id(long): 仓位id
-			hold_amount(string): 持仓量
-			eveningup(string): 可平仓量
-			margin(double): 固定保证金
-			realized(double):已实现盈亏
-
-			逐仓说明
-			contract_id(long): 合约id
-			contract_name(string): 合约名称
-			avgprice(string): 开仓均价
-			balance(string): 合约账户余额
-			bondfreez(string): 当前合约冻结保证金
-			costprice(string): 开仓价格
-			eveningup(string): 可平仓量
-			forcedprice(string): 强平价格
-			position(string): 仓位 1多仓 2空仓
-			profitreal(string): 已实现盈亏
-			fixmargin(double): 固定保证金
-			hold_amount(string): 持仓量
-			lever_rate(double): 杠杆倍数
-			position_id(long): 仓位id
-			symbol(string): btc_usd   ltc_usd   eth_usd   etc_usd   bch_usd
-			user_id(long):用户ID
-			 */
-			let re = [];
-			data.positions.map(h => {
-				if (h && h.eveningup > 0) {	
-					re.push({
-						Info: h,
-						MarginLevel: h.lever_rate,
-						Amount: h.eveningup,
-						FrozenAmount: N.parse(h.bondfreez),
-						Price: N.parse(h.avgprice),
-						Profit: N.parse(h.profitreal),
-						Type: h.position * 1 === 1 ? 'Long' : 'Short',
-						ContractType: this.options.DefaultContactType
-					});
-				}
-			});
-			this.options.onPositionChange(re);
-		}
-	}
-
-	onTrade(data, err) {
-		if (typeof this.options.onTrade === 'function' && !err) {
-			this.options.onTrade(data);
-		}
-	}
-
-	onIndex(data, err) {
-		if (typeof this.options.onIndex === 'function' && !err) {
-			this.options.onIndex(data.futureIndex);
-		}
-	}
-
-	async waitUntilWSReady() {
-		while (!this.wsReady) {
-			console.log('okex ws not ready');
-			await wait(300);
-		}
-	}
-
-	async GetAccount() {
-		await this.waitUntilWSReady();
-		return this.accountInfoQueue.push(() => {
-			this.ws.accountInfo();
-		});
-	}
-
-	onDepth(data, err) {
-		if (!err && data && data.bids && data.asks) {
-
-			let asks = [];
-			let bids = [];
-
-			for (let i = 0;i < data.bids.length;i++) {
-				bids.push({
-					Price: data.bids[i][0] * 1,
-					Amount: data.bids[i][1] * 1
-				});
-			}
-
-			for (let i = 0;i < data.asks.length;i++) {
-				asks.push({
-					Price: data.asks[i][0] * 1,
-					Amount: data.asks[i][1] * 1
-				});
-			}
-
-			data = {
-				Asks: R.sort( R.ascend( R.prop('Price') ), asks),
-				Bids: R.sort( R.descend( R.prop('Price') ), bids)
-			};
-		} else {
-			err = true;
-		}
-		
-		if (typeof this.options.onDepth === 'function') {
-			if (!err) {
-				this.options.onDepth(data);
-			}
-		}
-	}
-
 }
 
+function sign(params, secret) {
+	return md5(stringifyTookexFormat(params) + '&secret_key=' + secret).toUpperCase();
+}
 
-module.exports = EXCHANGE;
+function stringifyTookexFormat(obj) {
+	let arr = [],
+		i,
+		formattedObject = '';
+
+	for (i in obj) {
+		if (obj.hasOwnProperty(i)) {
+			arr.push(i);
+		}
+	}
+	arr.sort();
+	for (i = 0; i < arr.length; i++) {
+		if (i !== 0) {
+			formattedObject += '&';
+		}
+		formattedObject += arr[i] + '=' + obj[arr[i]];
+	}
+	return formattedObject;
+}
+
+module.exports = OKEX_FUTURE_WS;

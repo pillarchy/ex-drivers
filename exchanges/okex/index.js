@@ -159,6 +159,24 @@ class OKEX extends EXCHANGE {
 		return trades.filter(o => o.DealAmount > 0);
 	}
 
+	async GetPublicTrades(Currency, BaseCurrency, since) {
+		let data = await this.rest.GetPublicTrades(Currency, BaseCurrency, since);
+		let trades = [];
+		if (data && data.length > 0) {
+			data.map(o => {
+				trades.push({
+					Id: o.tid,
+					Time: N.parse(o.date_ms),
+					Price: N.parse(o.price),
+					Amount: N.parse(o.amount),
+					Type: this._order_type(o.type),
+					...this.rest._parse_ch(this.rest._getSymbol(Currency, BaseCurrency))
+				});
+			});
+		};
+		return trades;
+	}
+
 	Trade(type, price, amount, Currency, BaseCurrency) {
 		ok( amount > 0, 'amount should greater than 0');
 		if (this.options.Decimals) price = N(price).round(this.options.Decimals);

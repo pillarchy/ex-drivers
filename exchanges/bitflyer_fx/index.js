@@ -2,14 +2,14 @@ const N = require('precise-number');
 const { ok } = require('assert');
 const R = require('ramda');
 const moment = require('moment');
-const WebSocket = require("rpc-websockets").Client;
 const REST = require('./rest.js');
 const EventEmitter = require('events');
 const EXCHANGE = require('../exchange.js');
 const ExError = require('../../lib/error');
 const ErrorCode = require('../../lib/error-code');
+const io = require('socket.io-client');
 
-class EX extends EXCHANGE {
+class BITFLYER_FX extends EXCHANGE {
 	constructor(options) {
 
 		options = Object.assign({
@@ -18,9 +18,9 @@ class EX extends EXCHANGE {
 				Maker: 0,
 				Taker: 0
 			},
-			RateLimit: 10,
+			RateLimit: 3,
 			Decimals: 0,
-			StockDecimals: 3,
+			StockDecimals: 8,
 			MinTradeStocks: 0.01,
 			BaseCurrency: 'JPY',
 			Currency: 'BTC',
@@ -29,9 +29,9 @@ class EX extends EXCHANGE {
 		}, options);
 		super(options);
 
-		this.Currency = options.Currency;
 		this.options = options;
 		this.symbol = 'FX_' + options.Currency + '_' + options.BaseCurrency;
+		this.options.ContractType = this.symbol;
 
 		this.fee = {
 			Maker: 0,
@@ -39,8 +39,6 @@ class EX extends EXCHANGE {
 		};
 
 		this.rest = new REST(this.options);
-
-		this.wsReady = false;
 
 		this.orderbook = null;
 
@@ -50,31 +48,54 @@ class EX extends EXCHANGE {
 		this.events = new EventEmitter();
 
 		if (this.options.isWS) {
-			this.ws = new WebSocket("wss://ws.lightstream.bitflyer.com/json-rpc");
+			this.initiateWS();
 
-			this.ws.on("open", () => {
+			setInterval(() => {
+				if (Date.now() - this.lastDepthTime >= 5000) {
+					console.error('websocket dead, reconnecting ... ');
+					this.initiateWS();
+				}
+			}, 5000);
+		}
+	}
+
+	initiateWS() {
+		if (this.ws) {
+			try {
+				this.ws.close();
+			} catch (err) {
+				console.error('close old ws error', err);
+			}
+		}
+
+		try {
+
+			this.wsReady = false;
+
+			this.ws = io("https://io.lightstream.bitflyer.com", { transports: ["websocket"] });
+
+			let snapshotChannel = "lightning_board_snapshot_" + this.symbol;
+			let depthChannel = "lightning_board_" + this.symbol;
+			this.ws.on("connect", () => {
 				console.log('bitflyer_fx ws on open');
-				this.ws.call("subscribe", {
-					channel: "lightning_board_snapshot_" + this.symbol
-				});
+				this.ws.emit("subscribe", snapshotChannel);
 
 				if (!this.options.SnapshotMode) {
-					this.ws.call("subscribe", {
-						channel: "lightning_board_" + this.symbol
-					});
+					this.ws.emit("subscribe", depthChannel);
 				}
 			});
 
-			this.ws.on("channelMessage", notify => {
-				//console.log(notify);
-				if (notify.channel === 'lightning_board_snapshot_' + this.symbol) {
-					this.buildOrderBook(notify.message);
-				} else if (notify.channel === 'lightning_board_' + this.symbol) {
-					this.updateOrderBook(notify.message);
-				} else {
-					console.error('unkonwn event', notify);
-				}
+			this.ws.on(snapshotChannel, notify => {
+				this.wsReady = true;
+				this.buildOrderBook(notify);
 			});
+
+			this.ws.on(depthChannel, notify => {
+				this.wsReady = true;
+				this.updateOrderBook(notify);
+			});
+		} catch (err) {
+			console.error("new websocket error", err);
 		}
 	}
 
@@ -91,7 +112,6 @@ class EX extends EXCHANGE {
 				this.orderbook.Bids[r.price] = N.parse(r.size);
 			});
 		}
-		this.wsReady = true;
 		this.onDepthData();
 	}
 
@@ -177,7 +197,10 @@ class EX extends EXCHANGE {
 
 		let depth = {
 			Asks: R.sort( R.ascend( R.prop('Price') ), asks),
-			Bids: R.sort( R.descend( R.prop('Price') ), bids)
+			Bids: R.sort( R.descend( R.prop('Price') ), bids),
+			Currency: this.options.Currency,
+			BaseCurrency: this.options.BaseCurrency,
+			ContractType: this.options.ContractType
 		};
 
 		if (typeof this.options.onDepth === 'function') {
@@ -225,7 +248,11 @@ class EX extends EXCHANGE {
 				Time: moment(data.timestamp).format('x') * 1,
 				High: N.parse(data.best_ask),
 				Low: N.parse(data.best_bid),
-				Volume: N.parse(data.volume_by_product)
+				Volume: N.parse(data.volume_by_product),
+				Currency: this.options.Currency,
+				BaseCurrency: this.options.BaseCurrency,
+				ContractType: this.options.ContractType,
+				Info: data
 			};
 		});
 	}
@@ -260,6 +287,10 @@ class EX extends EXCHANGE {
 		     sfd: 0 } ]
 		 */
 		return this.rest.GetPosition().then(positions => {
+			if (!positions || !positions.map) {
+				console.log('bad positions', positions);
+				throw new Error('bad position data' + JSON.stringify(positions));
+			}
 			return positions.map(p => {
 				let re = {
 					Amount: N.parse(p.size),
@@ -268,6 +299,8 @@ class EX extends EXCHANGE {
 					Price: N.parse(p.price),
 					Type: p.side === 'BUY' ? 'Long' : 'Short',
 					ContractType: p.product_code,
+					Currency: this.options.Currency,
+					BaseCurrency: this.options.BaseCurrency,
 					Info: p
 				};
 				return re;
@@ -287,9 +320,11 @@ class EX extends EXCHANGE {
 		let positions = await this.GetPosition();
 		let re = {
 			Amount: 0,
-			ContractType: this.symbol,
+			ContractType: this.options.ContractType,
 			Price: 0,
-			MarginLevel: 0	
+			MarginLevel: 0,
+			Currency: this.options.Currency,
+			BaseCurrency: this.options.BaseCurrency
 		};
 
 		positions.map( p => {
@@ -318,6 +353,8 @@ class EX extends EXCHANGE {
 			FrozenAmount: 0,
 			Price: 0,
 			ContractType: '',
+			Currency: this.options.Currency,
+			BaseCurrency: this.options.BaseCurrency,
 			Info: []
 		};
 		arr.map(p => {
@@ -342,7 +379,7 @@ class EX extends EXCHANGE {
 		 */
 		let info = await this.rest.GetCollateral();
 		let total = info.collateral || 0;
-		let totalBalance = Math.floor(total / 0.8);
+		let totalBalance = total;//Math.floor(total / 0.8);
 		let usedBalance = Math.floor(info.require_collateral);
 
 		return {
@@ -351,35 +388,11 @@ class EX extends EXCHANGE {
 			Stocks: 0,
 			FrozenStocks: 0,
 			MarginLevel: info.keep_rate > 0 ? (N(1).div(info.keep_rate).multiply(this.options.MarginLevel) * 1) : 0,
+			Currency: this.options.Currency,
+			BaseCurrency: this.options.BaseCurrency,
+			ContractType: this.options.ContractType,
 			Info: info
 		};
-
-		// return this.rest.GetAccount().then(data => {
-		// 	console.log(data);
-		// 	if (data && data.length > 0) {
-		// 		let re = {
-		// 			Balance: null,
-		// 			FrozenBalance: 0,
-		// 			Stocks: null,
-		// 			FrozenStocks: 0
-		// 		};
-		// 		data.map(r => {
-		// 			if (r.currency_code === this.Currency) {
-		// 				re.Stocks = N.parse(r.amount);
-		// 			} else if (r.currency_code === 'JPY') {
-		// 				re.Balance = N.parse(r.amount);
-		// 			}
-		// 		});
-
-		// 		if (re.Balance === null || re.FrozenBalance === null || re.Stocks === null || re.FrozenStocks === null) {
-		// 			throw new Error(this.GetName() + 'GetAccount returns error: ' + JSON.stringify(data));
-		// 		}
-
-		// 		return re;
-		// 	} else {
-		// 		throw new Error(this.GetName() + 'GetAccount return error: ' + JSON.stringify(data));
-		// 	}
-		// });
 	}
 
 	GetOrders() {
@@ -414,6 +427,8 @@ class EX extends EXCHANGE {
 			Time: moment(o.child_order_date).format('x') * 1,
 			Status: this._order_status(o.child_order_state),
 			ContractType: o.product_code,
+			Currency: this.options.Currency,
+			BaseCurrency: this.options.BaseCurrency,
 			Info: o
 		};
 	}
@@ -451,15 +466,14 @@ class EX extends EXCHANGE {
 		}
 	}
 
-	Trade(type, price, amount) {
+	Trade(type, price, amount, time_in_force, minute_to_expire) {
 		amount = N(amount).floor(this.options.StockDecimals);
-		price = N(price).floor(this.options.Decimals);
+		if (price !== -1) price = N(price).floor(this.options.Decimals);
 
 		ok( amount > 0, 'amount should greater than 0');
-		ok( price > 0, 'price should greater than 0');
 
-		console.log(this.GetName(), type, price, amount);
-		return this.rest.Trade(type, price, amount);
+		console.log(this.GetName(), type, price, amount, time_in_force || '', minute_to_expire || '');
+		return this.rest.Trade(type, price, amount, time_in_force, minute_to_expire);
 	}
 
 	Long(price, amount) {
@@ -482,4 +496,4 @@ class EX extends EXCHANGE {
 }
 
 
-module.exports = EX;
+module.exports = BITFLYER_FX;

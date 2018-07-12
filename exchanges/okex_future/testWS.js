@@ -1,66 +1,26 @@
-const path = require('path');
+const { OKEX_FUTURE: EX } = require('../../index.js');
+const config = require('../../accounts.config.json');
 
-global.testing = true;
-global.chai = require('chai');
-global.expect = chai.expect;
-
-const assert = require('assert');
-
-let config = require('../../accounts.config.json');
-const N = require('precise-number');
-const wait = require('delay');
-
-const OKCoin = require('./index.js');
-const Exchange = new OKCoin({
+let ex = new EX({
+	Currency: 'BTC',
+	BaseCurrency: 'USD',
 	Key: config.okex.key,
 	Secret: config.okex.secret,
-	Currency: 'BTC',
-	BaseCurrency: 'USDT',
 	isWS: true,
 	DefaultContactType: 'quarter',
-	MarginLevel: 10,
-	// onDepth(depth) {
-	// 	console.log('on depth', depth.Asks.pop().Price, depth.Bids[0].Price);
-	// },
-	// onPositionChange(data) {
-	// 	console.log('on position change', data);
-	// },
-	// onTrade(data) {
-	// 	console.log('on trade', data);
-	// },
-	onIndex(data) {
-		console.log('on index', data);
+	onDepth(data) {
+		console.log('onDepth', data.Currency, data.BaseCurrency, data.Asks.length, data.Bids.length);
 	},
-	// onAccountChange(data) {
-	// 	console.log('on account change', data);
-	// },
-
-	// onTicker(data) {
-	// 	console.log('on ticker', data);
-	// }
+	onTicker(data) {
+		console.log('onTicker', data.Currency, data.BaseCurrency, data.Buy, data.Sell);
+	},
+	onPublicTrades(data) {
+		console.log('onPublicTrades', data);
+	}
 });
 
-const log = console.log.bind(console);
+//subscribe more data
+ex.Subscribe('EOS', 'USD', 'Depth');
+ex.Subscribe('EOS', 'USD', 'Ticker');
+ex.Subscribe('EOS', 'USD', 'PublicTrades');
 
-describe('test okex websocket', function() {
-
-	this.timeout(100000000);
-
-	it('should get index kline', async () => {
-		console.log(await Exchange.GetAvgPriceShift());
-
-		console.log('position is', await Exchange.GetPosition());
-
-	});
-
-	it('should wait a long time', async () => {
-
-
-
-		console.log('wait until ws ready');
-		await Exchange.waitUntilWSReady();
-		console.log('ws ready');
-		await wait(100000000);
-	});
-
-});

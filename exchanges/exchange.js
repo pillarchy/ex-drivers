@@ -71,6 +71,7 @@ class EXCHANGE {
 	 * get the minimum trade amount
 	 */
 	GetMin() {
+		if (this.options.MinTradeStocks) return this.options.MinTradeStocks;
 		return this.options.MinTradeAmount || 0.01;
 	}
 

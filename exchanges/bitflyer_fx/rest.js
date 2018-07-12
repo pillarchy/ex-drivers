@@ -1,21 +1,19 @@
 const fetch = require('node-fetch');
-const N = require('precise-number');
 const R = require('ramda');
 const debug = require('debug')('exchange:bitflyer:rest');
-const wait = require('delay');
 const crypto = require('crypto');
 const urlencode = require('urlencode-for-php');
 const ExError = require('../../lib/error');
 const ErrorCode = require('../../lib/error-code');
+const agent = require('../../lib/agent');
 
-class REST {
+class BITFLYER_FX_REST {
 
 	constructor(options) {
 		this.key = options.Key;
 		this.secret = options.Secret;
-		if (!options.Currency) options.Currency = 'BTC';
-		if (!options.BaseCurrency) options.BaseCurrency = 'JPY';
 		this.symbol = 'FX_' + options.Currency + '_' + options.BaseCurrency;
+		this.options = options;
 	}
 
 	fetch(url, params, method, allowEmptyResponse = false) {
@@ -46,7 +44,8 @@ class REST {
 				'ACCESS-TIMESTAMP': timestamp,
 				'ACCESS-SIGN': sign,
 				'Content-Type': 'application/json'
-			}
+			},
+			agent: agent.https
 		};
 
 		if (body) options.body = body;
@@ -107,7 +106,7 @@ class REST {
 		return this.fetch('/v1/me/getchildorders', params, 'GET');
 	}
 
-	Trade(type, price, amount) {
+	Trade(type, price, amount, time_in_force, minute_to_expire) {
 		let params = {
 			product_code: this.symbol,
 			child_order_type: "LIMIT",
@@ -115,6 +114,14 @@ class REST {
 			price,
 			size: amount
 		};
+		if (price === -1) {
+			params.child_order_type = 'MARKET';
+			delete params.price;
+		}
+		
+		if (time_in_force) params.time_in_force = time_in_force;
+		if (minute_to_expire) params.minute_to_expire = minute_to_expire;
+
 		return this.fetch('/v1/me/sendchildorder', params, 'POST').then(o => {
 			if (o && o.status === -205) throw new ExError(ErrorCode.INSUFFICIENT_BALANCE, JSON.stringify(o));
 			if (o && o.child_order_acceptance_id) return o.child_order_acceptance_id;
@@ -165,12 +172,15 @@ class REST {
 			}
 
 			return Promise.resolve({
-				Asks: R.sort( R.descend( R.prop('Price') ), asks),
-				Bids: R.sort( R.descend( R.prop('Price') ), bids)
+				Asks: R.sort( R.ascend( R.prop('Price') ), asks),
+				Bids: R.sort( R.descend( R.prop('Price') ), bids),
+				Currency: this.options.Currency,
+				BaseCurrency: this.options.BaseCurrency,
+				ContractType: this.options.ContractType
 			});
 		});
 	}
 }
 
 
-module.exports = REST;
+module.exports = BITFLYER_FX_REST;
