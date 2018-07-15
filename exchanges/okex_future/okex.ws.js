@@ -1,7 +1,7 @@
 const { md5 }  = require('utility');
 const WS = require('../../lib/auto-reconnect-ws.js');
 const debug = require('debug')('okex:ws2');
-const clor = require('clor');
+const tc = require('turbocolor');
 
 class okex {
 
@@ -51,14 +51,14 @@ class okex {
 
 	subscribe(channels) {
 		let socketURL = 'wss://real.okex.com:10440/websocket/okexapi';
-		let ws = new WS(socketURL); 
+		let ws = new WS(socketURL);
 		this.ws = ws;
 
 		channels.addChannel = (data) => {
 			if (data && data.result) {
-				console.log(clor.green('okex websocket channel subscribed').toString(), data.channel);
+				console.log(tc.green('okex websocket channel subscribed'), data.channel);
 			} else {
-				console.log(clor.red('okex websocket subscribe failed channel = ').toString(), data.channel);
+				console.log(tc.red('okex websocket subscribe failed channel = '), data.channel);
 			}
 		};
 
@@ -111,9 +111,9 @@ class okex {
 			messages.forEach(message => {
 				if (message['channel'] === 'login') {
 					if (message['data'] && message['data'].result) {
-						console.log(clor.green('okex websocket login success').toString());
+						console.log(tc.green('okex websocket login success'));
 					} else {
-						console.error(clor.red('okex websocket login faild').toString(), message);
+						console.error(tc.red('okex websocket login failed'), message);
 						process.exit();
 						return;
 					}
@@ -132,9 +132,9 @@ class okex {
 					// if (message.type === 'order' && message.data && this.options.onTrade) {
 					// 	this.options.onTrade(message.data);
 					// }
-					// console.log('unhandled message', clor.red(JSON.stringify(message, null, '\t')) + '');
+					// console.log('unhandled message', tc.red(JSON.stringify(message, null, '\t')) + '');
 					return;
-				} 
+				}
 
 				if (message['errorcode']) {
 					message['errormessage'] = errorMessage(message['errorcode']);

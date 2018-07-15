@@ -4,7 +4,7 @@ const moment = require('moment');
 const R = require('ramda');
 const { md5 }  = require('utility');
 const Events = require('events');
-const clor = require('clor');
+const tc = require('turbocolor');
 
 class OKEX_FUTURE_WS extends Events {
 	constructor(options) {
@@ -104,11 +104,11 @@ class OKEX_FUTURE_WS extends Events {
 		messages.forEach(message => {
 			if (message.channel === 'login') {
 				if (message.data && message.data.result) {
-					console.log(clor.green('okex websocket login success').toString());
+					console.log(tc.green('okex websocket login success'));
 					this.wsReady = true;
 					this.emit('connect');
 				} else {
-					console.error(clor.red('okex websocket login faild').toString(), message);
+					console.error(tc.red('okex websocket login failed'), message);
 					process.exit();
 					return;
 				}
@@ -146,7 +146,7 @@ class OKEX_FUTURE_WS extends Events {
 		} else if (type === 'PublicTrades') {
 			channel = `ok_sub_futureusd_${Currency}_trade_${ContractType}`.toLowerCase();
 		}
-		
+
 		if (!channel) throw new Error('unkown subscription type: ' + type);
 
 		let cmd = JSON.stringify({
