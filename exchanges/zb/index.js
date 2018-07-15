@@ -295,6 +295,10 @@ class ZB extends EXCHANGE {
 		return this.rest.GetDepth(Currency, BaseCurrency, size, merge);
 	}
 
+	GetRecords(...args) {
+		return this.rest.GetRecords(...args);
+	}
+
 }
 
 module.exports = ZB;
