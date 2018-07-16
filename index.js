@@ -12,5 +12,6 @@ module.exports = {
 	RateLimiter: require('./lib/rate-limit.js'),
 	AutoKiller: require('./lib/auto-kill.js'),
 
-	ErrorCode: require('./lib/error-code.js')
+	ErrorCode: require('./lib/error-code.js'),
+	utils: require('./lib/utils.js')
 };
