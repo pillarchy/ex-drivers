@@ -235,7 +235,8 @@ class ZB_REST {
 		if (!BaseCurrency) BaseCurrency = this.options.BaseCurrency;
 		let params = {
 			size,
-			market: this._getSymbol(Currency, BaseCurrency)
+			market: this._getSymbol(Currency, BaseCurrency),
+			_t: Math.random()
 		};
 		if (merge) params.merge = merge;
 

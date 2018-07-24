@@ -74,9 +74,18 @@ class OKEX_REST {
 
 		url = 'https://www.okex.com/api/v1/' + url;
 		return fetch(url, options).then(async res => {
-			let json = await res.json();
 			let status = res.status;
 			if (status === 429) throw new ExError(ErrorCode.REQUEST_TOO_FAST, url + ' too many requests');
+
+			let raw = await res.text();
+			debug('>>', method, url, 'RESPONSE:', raw);
+			if (!raw) throw new Error('okex rest response text is empty');
+			let json = null;
+			try {
+				json = JSON.parse(raw);
+			} catch (err) {
+				console.error('okex rest method returns bad json:', raw);
+			}
 
 			if (json && json.error_code) {
 				json.error_message = errorMessage(json.error_code);
@@ -206,16 +215,6 @@ class OKEX_REST {
 				});
 			}
 
-			bids.sort((a, b) => {
-				let diff = a.Price - b.Price;
-				return diff > 0 ? -1 : diff == 0 ? 0 : 1;
-			});
-
-			asks.sort((a, b) => {
-				let diff = a.Price - b.Price;
-				return diff > 0 ? 1 : diff == 0 ? 0 : -1;
-			});
-
 			return Promise.resolve({
 				Asks: R.sort( R.ascend( R.prop('Price') ), asks),
 				Bids: R.sort( R.descend( R.prop('Price') ), bids),
@@ -241,7 +240,7 @@ function stringifyForSign(obj) {
 	}
 	arr.sort();
 	for (i = 0; i < arr.length; i++) {
-		if (i != 0) {
+		if (i !== 0) {
 			formattedObject += '&';
 		}
 		formattedObject += arr[i] + '=' + obj[arr[i]];
