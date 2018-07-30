@@ -36,7 +36,7 @@ class ZB_REST {
 		}
 		debug('<<<', params);
 
-		return fetch('https://trade.bitkk.com/api/' + params.method + '?' + vars.join('&'), {
+		return fetch('https://trade.zb.com/api/' + params.method + '?' + vars.join('&'), {
 			method: 'GET',
 			timeout,
 			agent: agent.https
@@ -66,7 +66,7 @@ class ZB_REST {
 		for (let key in params) {
 			vars.push(key + '=' + encodeURIComponent(params[key]));
 		}
-		let url = 'http://api.bitkk.com/data/v1/' + method + '?' + vars.join('&');
+		let url = 'http://api.zb.com/data/v1/' + method + '?' + vars.join('&');
 		debug('<<<', url);
 
 		return fetch(url, {
@@ -82,7 +82,6 @@ class ZB_REST {
 				let r = JSON.parse(raw);
 				return r;
 			} catch (err) {
-				console.log('bbbbbbbbbbbbbbbbbbbbbbbb');
 				throw new ExError(ErrorCode.UNKNOWN_ERROR, raw, err);
 			}
 		}).catch(err => {

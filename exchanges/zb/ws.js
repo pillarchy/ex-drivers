@@ -18,7 +18,7 @@ class ZB_WS extends Events {
 		this.symbol = this.options.Currency.toLowerCase() + this.options.BaseCurrency.toLowerCase();
 		this.history = [];
 
-		this.ws = new WebSocket('wss://api.bitkk.com:9999/websocket');
+		this.ws = new WebSocket('wss://api.zb.com:9999/websocket');
 
 		this.symbols = {};
 		this.symbols[this.symbol] = {
