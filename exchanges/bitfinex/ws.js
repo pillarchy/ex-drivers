@@ -1,4 +1,3 @@
-const ws = require('ws');
 const N = require('precise-number');
 const R = require("ramda");
 const BFX = require('bitfinex-api-node');
@@ -10,11 +9,10 @@ function wait(ms) {
 class Bitfinex {
 
 	constructor(options) {
-		this.key = options.WSKey;
-		this.secret = options.WSSecret;
+		this.key = options.WSKey || options.Key;
+		this.secret = options.WSSecret || options.Secret;
 		if (!this.key || !this.secret) throw new Error('Bitfinex websocket mode need WSKey and WSSecret in options');
 
-		if (!options.Currency) options.Currency = 'BTC';
 		this.options = options;
 		this.symbol = options.Currency.toLowerCase() + 'usd';
 
@@ -66,7 +64,7 @@ class Bitfinex {
 			UNSETTLED_INTEREST	float	Unsettled interest
 			BALANCE_AVAILABLE	float / null	Amount not tied up in active orders, positions or funding (null if the value is not fresh enough).
 			 */
-			let [WALLET_TYPE, CURRENCY, BALANCE, UNSETTLED_INTEREST, BALANCE_AVAILABLE] = data;
+			let [WALLET_TYPE, CURRENCY, BALANCE] = data;
 			if (WALLET_TYPE === 'exchange') {
 				if (CURRENCY === 'USD') {
 					this.account.Balance = N.parse(BALANCE);
@@ -93,7 +91,6 @@ class Bitfinex {
 		this.ws.on('auth', () => {
 			this.ws_ready = true;
 		});
-
 	}
 
 	waitUntilWSReady() {
@@ -104,7 +101,7 @@ class Bitfinex {
 			let timer = setTimeout( () => {
 				reject('bitfinex websocket connection timeout');
 				process.exit();
-			}, 60000);
+			}, 20000);
 
 			while (true) {
 				await wait(100);
@@ -178,9 +175,6 @@ class Bitfinex {
 
 		asks = R.sort( R.ascend( R.prop('Price') ), asks);
 		bids = R.sort( R.descend( R.prop('Price') ), bids);
-		
-		if (asks.length > 30) asks = asks.slice(0, 30); 
-		if (bids.length > 30) bids = bids.slice(0, 30);
 
 		let orders = {};
 		asks.map(r => {
@@ -194,7 +188,9 @@ class Bitfinex {
 		if (typeof this.options.onDepth === 'function') {
 			this.options.onDepth({
 				Asks: R.sort( R.ascend( R.prop('Price') ), asks),
-				Bids: R.sort( R.descend( R.prop('Price')), bids)
+				Bids: R.sort( R.descend( R.prop('Price')), bids),
+				Currency: this.options.Currency,
+				BaseCurrency: this.options.BaseCurrency
 			});
 		}
 	}

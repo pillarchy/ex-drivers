@@ -1,5 +1,5 @@
-const EXCHANGE_REST = require('./bitfinex.rest.js');
-const EXCHANGE_WS = require('./bitfinex.ws.js');
+const EXCHANGE_REST = require('./rest.js');
+const EXCHANGE_WS = require('./ws.js');
 const N = require('precise-number');
 const { ok } = require('assert');
 const wait = require('delay');

@@ -3,6 +3,7 @@ module.exports = {
 	OKEX_FUTURE: require('./exchanges/okex_future/index.js'),
 	BINANCE: require('./exchanges/binance/index.js'),
 	BITFINEX: require('./exchanges/bitfinex/index.js'),
+	BITSTAMP: require('./exchanges/bitstamp/index.js'),
 	BITFLYER_FX: require('./exchanges/bitflyer_fx/index.js'),
 	HUOBI: require('./exchanges/huobi/index.js'),
 	HADAX: require('./exchanges/huobi/hadax.js'),
@@ -12,5 +13,6 @@ module.exports = {
 	RateLimiter: require('./lib/rate-limit.js'),
 	AutoKiller: require('./lib/auto-kill.js'),
 
-	ErrorCode: require('./lib/error-code.js')
+	ErrorCode: require('./lib/error-code.js'),
+	utils: require('./lib/utils.js')
 };

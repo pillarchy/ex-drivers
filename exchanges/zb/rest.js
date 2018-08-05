@@ -36,7 +36,7 @@ class ZB_REST {
 		}
 		debug('<<<', params);
 
-		return fetch('https://trade.bitkk.com/api/' + params.method + '?' + vars.join('&'), {
+		return fetch('https://trade.zb.com/api/' + params.method + '?' + vars.join('&'), {
 			method: 'GET',
 			timeout,
 			agent: agent.https
@@ -61,6 +61,38 @@ class ZB_REST {
 		});
 	}
 
+	async get(method, params = {}, timeout = 5000) {
+		let vars = [];
+		for (let key in params) {
+			vars.push(key + '=' + encodeURIComponent(params[key]));
+		}
+		let url = 'http://api.zb.com/data/v1/' + method + '?' + vars.join('&');
+		debug('<<<', url);
+
+		return fetch(url, {
+			method: 'GET',
+			timeout,
+			agent: agent.http
+		}).then(async res => {
+			let raw = await res.text();
+			let status = res.status;
+			debug('>>>', status, raw);
+			if (status !== 200) throw new ExError(ErrorCode.BAD_RESPONSE_STATUS, `zb rest request to ${url} returns bad status: ` + status);
+			try {
+				let r = JSON.parse(raw);
+				return r;
+			} catch (err) {
+				throw new ExError(ErrorCode.UNKNOWN_ERROR, raw, err);
+			}
+		}).catch(err => {
+			console.log(err);
+			if (err.type === 'request-timeout') {
+				throw new ExError(ErrorCode.REQUEST_TIMEOUT, `zb rest request (${url}) timeout`, err);
+			}
+			throw err;
+		});
+	}
+
 	GetAccount() {
 		return this.request({
 			method: 'getAccountInfo'
@@ -72,21 +104,9 @@ class ZB_REST {
 
 	async GetTicker(Currency, BaseCurrency) {
 		const symbol = this._getSymbol(Currency, BaseCurrency);
-		let res = await fetch('http://api.bitkk.com/data/v1/ticker?market=' + symbol, {
-			timeout: 5000,
-			agent: agent.http
-		});
-		let status = res.status;
-		let text = await res.text();
-		if (status !== 200) throw new ExError(ErrorCode.BAD_RESPONSE_STATUS, 'zb GetTicker returns bad status: ' + status);
-
-		try {
-			let data = JSON.parse(text);
-			data.route = 'rest';
-			return data;
-		} catch (err) {
-			throw new ExError(ErrorCode.INVALID_JSON, 'bad json string: ' + text, err);
-		}
+		let data = await this.get('ticker', {market: symbol});
+		data.route = 'rest';
+		return data;
 	}
 
 	GetTrades(page = 1, pageSize = 100, Currency, BaseCurrency) {
@@ -212,14 +232,14 @@ class ZB_REST {
 		if (!size) size = 30;
 		if (!Currency) Currency = this.options.Currency;
 		if (!BaseCurrency) BaseCurrency = this.options.BaseCurrency;
-		let url = `http://api.bitkk.com/data/v1/depth?size=${size}&market=${this._getSymbol(Currency, BaseCurrency)}`;
-		if (merge) url += '&merge=' + merge;
+		let params = {
+			size,
+			market: this._getSymbol(Currency, BaseCurrency),
+			_t: Math.random()
+		};
+		if (merge) params.merge = merge;
 
-		debug('get depth url = ', url);
-		return fetch(url, {
-			timeout: 5000,
-			agent: agent.http
-		}).then(r => r.json()).then(data => {
+		return this.get('depth', params).then(data => {
 			if (data && data.error) throw data.error;
 			debug('get depth returns:', data);
 			if (!data.asks || !data.bids) return;
@@ -246,13 +266,51 @@ class ZB_REST {
 			};
 
 			return depth;
-		}).catch(err => {
-			if (err && (err.code === 'ETIMEDOUT' || err.type === 'request-timeout')) {
-				throw ExError(ErrorCode.REQUEST_TIMEOUT, 'zb GetDepth timeout', err);
-			}
-			if (err && err.response && err.response.status === 502) throw 'zb rest GetDepth got 502';
-			throw err;
 		});
+	}
+
+	async GetRecords(seconds = 60, size = 1000, Currency, BaseCurrency) {
+		let type = this._secondsToPeriod(seconds);
+		if (!type) throw new Error('zb GetRecords does not support this period: ' + seconds);
+		if (size > 1000) throw new Error('zb GetRecords size should not larger than 1000');
+		
+		let data = await this.get('kline', {
+			market: this._getSymbol(Currency, BaseCurrency),
+			type,
+			size
+		});
+
+		if (data && data.data) {
+			return data.data.map(d => {
+				return {
+					Time: N.parse(d[0]),
+					Open: N.parse(d[1]),
+					High: N.parse(d[2]),
+					Low: N.parse(d[3]),
+					Close: N.parse(d[4]),
+					Volume: N.parse(d[5])
+				};
+			});
+		} else {
+			throw new Error(`zb got bad kline data: ${JSON.stringify(data)}`);
+		}
+	}
+
+	_secondsToPeriod(seconds) {
+		if (seconds === 60) return '1min';
+		if (seconds === 180) return '3min';
+		if (seconds === 300) return '5min';
+		if (seconds === 900) return '15min';
+		if (seconds === 1800) return '30min';
+		if (seconds === 86400) return '1day';
+		if (seconds === 86400 * 3) return '3day';
+		if (seconds === 86400 * 7) return '1week';
+		if (seconds === 3600) return '1hour';
+		if (seconds === 3600 * 2) return '2hour';
+		if (seconds === 3600 * 4) return '4hour';
+		if (seconds === 3600 * 6) return '6hour';
+		if (seconds === 3600 * 12) return '12hour';
+		return null;
 	}
 
 	_order_type( type ) {

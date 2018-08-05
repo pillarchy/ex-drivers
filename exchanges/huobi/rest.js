@@ -205,8 +205,11 @@ class HUOBI_REST {
 			return {
 				Asks: R.sort( R.ascend( R.prop('Price') ), tick.asks),
 				Bids: R.sort( R.descend( R.prop('Price') ), tick.bids),
-				Time: N.parse(data.ts),
-				...this._parse_ch(data.ch, Currency, BaseCurrency)
+				Time: N.parse(tick.ts),
+				...this._parse_ch(data.ch, Currency, BaseCurrency),
+				Info: {
+					ts: data.ts
+				}
 			};
 		});
 	}

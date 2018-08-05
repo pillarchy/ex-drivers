@@ -151,7 +151,11 @@ class HUOBI_WS extends Events {
 		let depth = {
 			Asks: R.sort( R.ascend( R.prop('Price') ), asks),
 			Bids: R.sort( R.descend( R.prop('Price') ), bids),
-			...this._parse_ch(message.ch)
+			...this._parse_ch(message.ch),
+			Time: N.parse(data.ts),
+			Info: {
+				ts: message.ts
+			}
 		};
 		this.options.onDepth(depth);
 	}
