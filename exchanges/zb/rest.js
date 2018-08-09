@@ -36,7 +36,7 @@ class ZB_REST {
 		}
 		debug('<<<', params);
 
-		return fetch('https://trade.zb.com/api/' + params.method + '?' + vars.join('&'), {
+		return (this.options.fetchFunction || fetch)('https://trade.zb.com/api/' + params.method + '?' + vars.join('&'), {
 			method: 'GET',
 			timeout,
 			agent: agent.https

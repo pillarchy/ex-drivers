@@ -484,6 +484,14 @@ class BITFLYER_FX extends EXCHANGE {
 		return this.Trade('Short', price, amount);
 	}
 
+	Buy() {
+		throw new Error('future exchange does not support Buy and Sell');
+	}
+
+	Sell() {
+		throw new Error('future exchange does not support Buy and Sell');
+	}
+
 	CancelOrder(orderId) {
 		return this.rest.CancelOrder(orderId);
 	}
