@@ -29,7 +29,6 @@ class BITFLYER_FX extends EXCHANGE {
 		}, options);
 		super(options);
 
-		this.options = options;
 		this.symbol = 'FX_' + options.Currency + '_' + options.BaseCurrency;
 		this.options.ContractType = this.symbol;
 

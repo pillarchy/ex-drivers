@@ -8,6 +8,9 @@ let ex = new EX({
 	Currency: 'BTC',
 	isWS: true,
 	SnapshotMode: false,
+	RateLimit: 1,
+	RateLimitInterval: 10000,
+	ThrowWhenRateLimited: true,
 	onDepth: (depth) => {
 		// console.log('on depth');
 		console.log('depth', depth.Asks.length, depth.Bids.length, depth.Asks[0].Price, depth.Bids[0].Price);
@@ -21,7 +24,8 @@ describe('test Bitflyer', function() {
 
 	this.timeout(10000);
 
-	// it('should get ticker', () => ex.GetTicker().then(log));
+	it('should get ticker', () => ex.GetTicker().then(log));
+	it('should get ticker', () => ex.GetTicker().then(log));
 
 	// it('should get depth', () => ex.GetDepth().then(log));
 	// 
@@ -63,8 +67,8 @@ describe('test Bitflyer', function() {
 	// 	console.log(await ex.CancelPendingOrders());
 	// });
 
-	it('should wait for a long time', function() {
-		this.timeout(1000000000);
-		return wait(1000000000);
-	});
+	// it('should wait for a long time', function() {
+	// 	this.timeout(1000000000);
+	// 	return wait(1000000000);
+	// });
 });
