@@ -129,7 +129,7 @@ class OKEX_FUTURE_WS extends Events {
 
 	onPong() {
 		let gap = Date.now() - this.lastPingTime;
-		console.log('okex websocket ping pong time:', gap + 'ms');
+		// console.log('okex websocket ping pong time:', gap + 'ms');
 		this.lastPong = Date.now();
 	}
 
