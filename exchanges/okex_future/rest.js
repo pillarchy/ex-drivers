@@ -111,9 +111,9 @@ class OKEX {
 			let re = {
 				Balance: 0,
 				FrozenBalance: 0,
-				Stocks: N.parse(info.balance),
-				FrozenStocks: 0,
-				Value: N.parse(info.rights),
+				Stocks: N.parse(info.account_rights),
+				FrozenStocks: N.parse(info.keep_deposit),
+				Value: 0,
 				this_week: null,
 				next_week: null,
 				quarter: null,
@@ -136,8 +136,7 @@ class OKEX {
 		let path = this.options.ContractMode === 'Seperate' ? 'future_position_4fix.do' : 'future_position.do';
 		return this.fetch(path, {
 			symbol: this.symbol,
-			contract_type: contract_type || this.options.DefaultContactType,
-			type: 1
+			contract_type: contract_type || this.options.DefaultContactType
 		}, 'POST');
 	}
 

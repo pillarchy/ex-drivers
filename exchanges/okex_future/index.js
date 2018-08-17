@@ -129,8 +129,8 @@ class OKEX_FUTURE extends EXCHANGE {
 		return this.rest.GetAccount(...args);
 	}
 
-	GetPosition() {
-		return this.getHandler().GetPosition().then(d => {
+	GetPosition(contract_type) {
+		return this.getHandler().GetPosition(contract_type).then(d => {
 			/*
 			{
 			    "holding": [{
