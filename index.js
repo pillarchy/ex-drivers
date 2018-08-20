@@ -9,6 +9,7 @@ module.exports = {
 	HADAX: require('./exchanges/huobi/hadax.js'),
 	ZB: require('./exchanges/zb/index.js'),
 	BITTREX: require('./exchanges/bittrex/index.js'),
+	BITMEX: require('./exchanges/bitmex/index.js'),
 
 	RateLimiter: require('./lib/rate-limit.js'),
 	AutoKiller: require('./lib/auto-kill.js'),

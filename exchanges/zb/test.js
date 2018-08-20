@@ -24,47 +24,51 @@ describe('test zb', function() {
 		return ex.waitUntilWSReady();
 	});
 
-	it('should get ticker', async () => {
-		let t = await ex.GetTicker();
-		debug(t);
-		assert(t);
-		assert(t.Last && t.Buy && t.Sell && t.Time && t.High && t.Low);
-		assert(t.Currency === 'USDT');
-		assert(t.BaseCurrency === 'QC');
-
-		t = await ex.GetTicker('EOS', 'USDT');
-		debug(t);
-		assert(t.Last && t.Buy && t.Sell && t.Time && t.High && t.Low);
-		assert(t.Currency === 'EOS');
-		assert(t.BaseCurrency === 'USDT');
+	it('should get tickers', async () => {
+		console.log(await ex.GetTickersMap());
 	});
 
-	it('should get depth', async () => {
-		let t = await ex.GetDepth();
-		debug(t);
-		assert(t);
-		assert(t.Asks && t.Bids);
-		assert(t.Asks.length > 0 && t.Bids.length > 0);
-		assert(t.Asks[0].Price > 0 && t.Asks[0].Amount > 0);
-		assert(t.Bids[0].Price > 0 && t.Bids[0].Amount > 0);
-		assert(t.Currency === 'USDT');
-		assert(t.BaseCurrency === 'QC');
+	// it('should get ticker', async () => {
+	// 	let t = await ex.GetTicker();
+	// 	debug(t);
+	// 	assert(t);
+	// 	assert(t.Last && t.Buy && t.Sell && t.Time && t.High && t.Low);
+	// 	assert(t.Currency === 'USDT');
+	// 	assert(t.BaseCurrency === 'QC');
 
-		t = await ex.GetDepth('EOS', 'USDT');
-		debug(t);
-		assert(t.Asks && t.Bids);
-		assert(t.Currency === 'EOS');
-		assert(t.BaseCurrency === 'USDT');
-	});
+	// 	t = await ex.GetTicker('EOS', 'USDT');
+	// 	debug(t);
+	// 	assert(t.Last && t.Buy && t.Sell && t.Time && t.High && t.Low);
+	// 	assert(t.Currency === 'EOS');
+	// 	assert(t.BaseCurrency === 'USDT');
+	// });
 
-	it('should get records', async () => {
-		let data = await ex.GetRecords();
-		data = data.map(d => {
-			d.Date = new Date(d.Time);
-			return d;
-		});
-		console.log(data);
-	});
+	// it('should get depth', async () => {
+	// 	let t = await ex.GetDepth();
+	// 	debug(t);
+	// 	assert(t);
+	// 	assert(t.Asks && t.Bids);
+	// 	assert(t.Asks.length > 0 && t.Bids.length > 0);
+	// 	assert(t.Asks[0].Price > 0 && t.Asks[0].Amount > 0);
+	// 	assert(t.Bids[0].Price > 0 && t.Bids[0].Amount > 0);
+	// 	assert(t.Currency === 'USDT');
+	// 	assert(t.BaseCurrency === 'QC');
+
+	// 	t = await ex.GetDepth('EOS', 'USDT');
+	// 	debug(t);
+	// 	assert(t.Asks && t.Bids);
+	// 	assert(t.Currency === 'EOS');
+	// 	assert(t.BaseCurrency === 'USDT');
+	// });
+
+	// it('should get records', async () => {
+	// 	let data = await ex.GetRecords();
+	// 	data = data.map(d => {
+	// 		d.Date = new Date(d.Time);
+	// 		return d;
+	// 	});
+	// 	console.log(data);
+	// });
 
 	// it('should get account', async () => {
 	// 	let t = await ex.GetAccount();

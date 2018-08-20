@@ -141,6 +141,28 @@ class ZB extends EXCHANGE {
 		};
 	}
 
+	async GetTickers() {
+		let data = await this.rest.GetTickers();
+		const Time = Date.now();
+		return Object.keys(data).map(okey => {
+			let key = okey.toUpperCase();
+			let Currency = key.replace(/(usdt|zb|btc|qc)$/i, '');
+			let BaseCurrency = key.replace(Currency, '');
+			let t = data[okey];
+			return {
+				Buy: N.parse(t.buy),
+				Sell: N.parse(t.sell),
+				High: N.parse(t.high),
+				Last: N.parse(t.last),
+				Low: N.parse(t.low),
+				Volume: N.parse(t.vol),
+				Time,
+				Currency,
+				BaseCurrency
+			};
+		});
+	}
+
 	Trade(type, price, amount, Currency = '', BaseCurrency = '') {
 		if (this.options.Decimals) price = N(price).round(this.options.Decimals);
 		if (this.options.StockDecimals) amount = N(amount).floor(this.options.StockDecimals);

@@ -81,6 +81,13 @@ class EXCHANGE {
 			return map;
 		}, {});
 	}
+
+	async GetTickersMap() {
+		return (await this.GetTickers()).reduce((map, t) => {
+			map[t.Currency + '_' + t.BaseCurrency] = t;
+			return map;
+		}, {});
+	}
 }
 
 

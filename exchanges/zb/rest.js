@@ -109,6 +109,11 @@ class ZB_REST {
 		return data;
 	}
 
+	async GetTickers() {
+		let data = await this.get('allTicker', {t: Date.now()});
+		return data;
+	}
+
 	GetTrades(page = 1, pageSize = 100, Currency, BaseCurrency) {
 		return this.request({
 			currency: this._getSymbol(Currency, BaseCurrency),
