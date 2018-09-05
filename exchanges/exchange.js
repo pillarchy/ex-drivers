@@ -75,6 +75,10 @@ class EXCHANGE {
 		return this.options.MinTradeAmount || 0.01;
 	}
 
+	async GetMarkets() {
+		throw new Error(this.options.Name + ' GetMarkets() method is not implemented');
+	}
+
 	async GetAccountsMap(...args) {
 		return (await this.GetAccounts(...args)).reduce((map, a) => {
 			map[a.Currency] = a;
@@ -87,6 +91,22 @@ class EXCHANGE {
 			map[t.Currency + '_' + t.BaseCurrency] = t;
 			return map;
 		}, {});
+	}
+
+	async GetMarketsMap() {
+		return (await this.GetMarkets()).reduce((map, t) => {
+			map[t.Currency + '_' + t.BaseCurrency] = t;
+			return map;
+		}, {});
+	}
+
+	async GetMarket(Currency, BaseCurrency) {
+		if (!this._markets_data) {
+			this._markets_data = await this.GetMarketsMap();
+		}
+		let symbol = Currency + '_' + BaseCurrency;
+		if (!this._markets_data[symbol]) throw new Error(`Market ${symbol} not found!`);
+		return this._markets_data[symbol];
 	}
 }
 

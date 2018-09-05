@@ -23,10 +23,26 @@ describe('test zb', function() {
 		return ex.waitUntilWSReady();
 	});
 
-	it('should get public trades', async () => {
-		console.log(await ex.GetPublicTrades());
-		console.log(await ex.GetPublicTrades('BTC'));
+	it('should get markets', async () => {
+		let markets = await ex.GetMarkets();
+		markets.map(m => {
+			console.log(m.Currency + '_' + m.BaseCurrency, m.Decimals, m.StockDecimals, m.MinTradeAmount);
+		});
 	});
+
+	it('should get MarketsMap', async () => {
+		console.log(await ex.GetMarketsMap());
+	});
+
+	it('should get market info', async () => {
+		console.log(await ex.GetMarket('BTC', 'USDT'));
+		console.log(await ex.GetMarket('ETH', 'BTC'));
+	});
+
+	// it('should get public trades', async () => {
+	// 	console.log(await ex.GetPublicTrades());
+	// 	console.log(await ex.GetPublicTrades('BTC'));
+	// });
 
 	// it('should get ticker', async () => {
 	// 	let t = await ex.GetTicker();

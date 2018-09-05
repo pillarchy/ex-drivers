@@ -28,6 +28,10 @@ describe('test zb', function() {
 		console.log(await ex.GetTickersMap());
 	});
 
+	it('should get markets', async () => {
+		console.log(await ex.GetMarkets());
+	});
+
 	// it('should get ticker', async () => {
 	// 	let t = await ex.GetTicker();
 	// 	debug(t);
