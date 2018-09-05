@@ -8,13 +8,13 @@ let okex = new ExDrivers.OKEX({
 	BaseCurrency: 'QC'
 });
 
-// describe('test accounts related', function() {
-// 	this.timeout(5000000);
+describe('test accounts related', function() {
+	this.timeout(5000000);
 
-// 	it('should get ticker', async () => {
-// 		console.log(await okex.FundsTransfer('BTC',0.1,'spot','future'));
-// 	});
+	it('should get ticker', async () => {
+		console.log(await okex.FundsTransfer('BTC',0.1,'spot','future'));
+	});
 
-// });
+});
 
-okex.FundsTransfer('BTC',0.1,'spot','future').then(console.log).catch(console.log);
+// okex.FundsTransfer('BTC',0.1,'spot','future').then(console.log).catch(console.log);
