@@ -188,6 +188,17 @@ class OKEX_REST {
 		return re;
 	}
 
+	async FundsTransfer(Currency,Amount,From,To){
+		let params = {
+			symbol: Currency.toLowerCase() + '_usd',
+			amount: Amount,
+			from: From,
+			to: To
+		};
+		let re = await this.fetch('funds_transfer.do', params);
+		return re;
+	}
+
 	GetDepth(Currency, BaseCurrency, size, merge) {
 		let params = ['symbol=' + this._getSymbol(Currency, BaseCurrency)];
 		if (!size) size = 50;

@@ -222,6 +222,15 @@ class OKEX extends EXCHANGE {
 		});
 	}
 
+	FundsTransfer(Currency,Amount,From,To){
+		From = this._funds_type(From);
+		To 	 = this._funds_type(To);
+		if( !From || !To ) {
+			throw new Error('Wrong funds type,[spot,future,wallet] expected');
+		}
+		return this.rest.FundsTransfer(Currency,Amount,From,To);
+	}
+
 	GetOrders(Currency, BaseCurrency) {
 		return this.GetOrder(-1, Currency, BaseCurrency);
 	}
@@ -252,6 +261,17 @@ class OKEX extends EXCHANGE {
 			'sell_market': 'Sell',
 			'buy': 'Buy',
 			'sell': 'Sell'
+		};
+		return arr[type];
+	}
+
+	_funds_type( type ) {
+		// 1：币币账户 3：合约账户 6：我的钱包
+		type = type.toString();
+		let arr = {
+			'spot'	:1,
+			'future':3,
+			'wallet':6
 		};
 		return arr[type];
 	}
