@@ -123,7 +123,9 @@ class HUOBI extends EXCHANGE {
 			'buy-limit': 'Buy',
 			'sell-limit': 'Sell',
 			'sell-limit-maker': 'Sell',
-			'buy-limit-maker': 'Buy'
+			'buy-limit-maker': 'Buy',
+			'sell-ioc': 'Sell',
+			'buy-ioc': 'Buy'
 		};
 
 		return {
@@ -150,7 +152,6 @@ class HUOBI extends EXCHANGE {
 	}
 
 	Trade(type, price, amount, Currency, BaseCurrency) {
-		if (type !== 'Buy' && type !== 'Sell') throw new Error('wrong trade type: ' + type);
 		if (this.options.StockDecimals) amount = N(amount).floor(this.options.StockDecimals);
 		if (this.options.Decimals) price = N(price).round(this.options.Decimals);
 		if (amount <= 0) throw new Error('trade amount should greater than 0');

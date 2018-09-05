@@ -50,6 +50,7 @@ class OKEX_WS extends Events {
 
 		this.wsReady = false;
 		this.ws.on('open', () => {
+			this.emit('connect');
 			this.subscriptionCommands.map(cmd => {
 				this.ws.send(cmd);
 			});

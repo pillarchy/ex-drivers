@@ -305,6 +305,15 @@ class HUOBI_REST {
 		});
 	}
 
+	GetOpenOrders() {
+		return this.get('/v1/order/openOrders', {
+			size: 500
+		}).then(r => {
+			if (!r.data) this.error('can not get orders:', r);
+			return r.data;
+		});
+	}
+
 	GetTrades(Currency, BaseCurrency) {
 		return this.get('/v1/order/orders', {
 			symbol: this._getSymbol(Currency, BaseCurrency),
@@ -382,12 +391,17 @@ class HUOBI_REST {
 	}
 
 	Trade(type, price, amount, Currency, BaseCurrency) {
-		let __type = price === -1 ? 'market' : 'limit';
-		let _type = `${type}-${__type}`.toLowerCase();
-		if (this.options.MakerMode && price !== -1) {
-			_type += '-maker';
+		type = String(type).toLowerCase();
+		if (!type) throw new Error('no trade type');
+		if (!type.match(/\-/)) {
+			let __type = price === -1 ? 'market' : 'limit';
+			type = `${type}-${__type}`;
 		}
-		return this._create_order(_type, price, amount, Currency, BaseCurrency);
+
+		if (this.options.MakerMode && type.match(/\-limit$/)) {
+			type += '-maker';
+		}
+		return this._create_order(type, price, amount, Currency, BaseCurrency);
 	}
 
 	GetRecords(minutes) {

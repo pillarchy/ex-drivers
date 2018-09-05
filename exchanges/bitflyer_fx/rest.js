@@ -16,8 +16,10 @@ class BITFLYER_FX_REST {
 		this.options = options;
 	}
 
-	fetch(url, params, method, allowEmptyResponse = false) {
+	async fetch(url, params, method, allowEmptyResponse = false, isPrivate = true) {
 		if (!method) throw new Error('need method');
+
+		if (isPrivate) await this.options.rateLimiter.wait();
 
 		let body = '';
 		if (method === 'GET') {
@@ -79,7 +81,7 @@ class BITFLYER_FX_REST {
 	GetTicker() {
 		return this.fetch(`/v1/getticker`, {
 			product_code: this.symbol
-		}, 'GET');
+		}, 'GET', false, false);
 	}
 
 	GetAccount() {
@@ -150,7 +152,7 @@ class BITFLYER_FX_REST {
 
 	GetDepth() {
 		
-		return this.fetch(`/v1/getboard?product_code=${this.symbol}`, null, 'GET').then(data => {
+		return this.fetch(`/v1/getboard?product_code=${this.symbol}`, null, 'GET', false, false).then(data => {
 
 			if (!data || !data.bids || !data.asks) throw new Error('get bitflyer ' + this.symbol + ' depth error ' + JSON.stringify(data));
 

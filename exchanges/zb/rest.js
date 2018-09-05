@@ -36,7 +36,7 @@ class ZB_REST {
 		}
 		debug('<<<', params);
 
-		return fetch('https://trade.zb.com/api/' + params.method + '?' + vars.join('&'), {
+		return (this.options.fetchFunction || fetch)('https://trade.zb.com/api/' + params.method + '?' + vars.join('&'), {
 			method: 'GET',
 			timeout,
 			agent: agent.https
@@ -106,6 +106,11 @@ class ZB_REST {
 		const symbol = this._getSymbol(Currency, BaseCurrency);
 		let data = await this.get('ticker', {market: symbol});
 		data.route = 'rest';
+		return data;
+	}
+
+	async GetTickers() {
+		let data = await this.get('allTicker', {t: Date.now()});
 		return data;
 	}
 
