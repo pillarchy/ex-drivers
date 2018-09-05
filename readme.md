@@ -26,9 +26,9 @@ Highly unified APIs for the crypto-currency exchanges.
 | CancelOrder()              | ✅      | ✅             | ✅               | ✅              | ✅            |
 | CancelPendingOrders()      | ✅      | ✅             | ✅               | ✅              | ✅            |
 | GetOrders()                | ✅      | ✅             | ✅               | ✅              | ✅            |
-|                            |        |               |                 |                |              |
-|                            |        |               |                 |                |              |
-|                            |        |               |                 |                |              |
+| GetMarkets()               | ✅      | ✅             |                 |                |              |
+| GetMarketsMap()            | ✅      | ✅             |                 |                |              |
+| GetMarket()                | ✅      | ✅             |                 |                |              |
 |                            |        |               |                 |                |              |
 |                            |        |               |                 |                |              |
 |                            |        |               |                 |                |              |
@@ -68,7 +68,7 @@ APIs:
 ]
 ```
 
-`GetTicker()`  get ticker data
+`GetTicker([Currency[, BaseCurrency]])`  get ticker data
 
 ```
 {
@@ -81,7 +81,7 @@ APIs:
 }
 ```
 
-`GetDepth()`  get depth data
+`GetDepth([Currency[, BaseCurrency]])`  get depth data
 
 ```
 {
@@ -115,6 +115,30 @@ APIs:
 ]
 ```
 
+`GetMarkets()` get markets information of the exchange
+```
+[
+	{
+		Currency: String,
+		BaseCurrency: String,
+		Decimals: integer,
+		StockDecimals: integer,
+		MinTradeAmount: float
+	},
+	...
+]
+```
+
+`GetMarket(Currency, BaseCurrency)` get market information by currency and base currency
+```
+{
+	Currency: String,
+	BaseCurrency: String,
+	Decimals: integer,
+	StockDecimals: integer,
+	MinTradeAmount: float
+}
+```
 
 
 ### ZB now support multiple subscriptions

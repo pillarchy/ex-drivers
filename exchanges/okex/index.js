@@ -5,6 +5,7 @@ const { ok } = require('assert');
 const EXCHANGE = require('../exchange.js');
 const ExError = require('../../lib/error');
 const ErrorCode = require('../../lib/error-code');
+const fetch = require('node-fetch');
 
 class OKEX extends EXCHANGE {
 	constructor(options) {
@@ -274,6 +275,28 @@ class OKEX extends EXCHANGE {
 			'wallet':6
 		};
 		return arr[type];
+	}
+
+	GetMarkets() {
+		return fetch('https://www.okex.com/v2/spot/markets/products').then(res => res.json()).then(obj => {
+			let arr = obj ? obj.data : [];
+			let re = [];
+			arr.map(m => {
+				if (!m || !m.symbol || m.symbol.match(/test[abc]/)) return;
+				let [Currency, BaseCurrency] = m.symbol.toUpperCase().split('_');
+				let Decimals = m.maxPriceDigit;
+				let StockDecimals = m.maxSizeDigit;
+				let MinTradeAmount = m.minTradeSize;
+				re.push({
+					Currency,
+					BaseCurrency,
+					Decimals,
+					StockDecimals,
+					MinTradeAmount
+				});
+			});
+			return re;
+		});
 	}
 
 }

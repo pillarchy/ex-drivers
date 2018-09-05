@@ -6,6 +6,7 @@ const debug = require('debug')('exchange:zb');
 const EXCHANGE = require('../exchange.js');
 const ExError = require('../../lib/error');
 const ErrorCode = require('../../lib/error-code');
+const fetch = require('node-fetch');
 
 class ZB extends EXCHANGE {
 	constructor(options) {
@@ -139,6 +140,28 @@ class ZB extends EXCHANGE {
 			BaseCurrency,
 			Info: data
 		};
+	}
+
+	async GetTickers() {
+		let data = await this.rest.GetTickers();
+		const Time = Date.now();
+		return Object.keys(data).map(okey => {
+			let key = okey.toUpperCase();
+			let Currency = key.replace(/(usdt|zb|btc|qc)$/i, '');
+			let BaseCurrency = key.replace(Currency, '');
+			let t = data[okey];
+			return {
+				Buy: N.parse(t.buy),
+				Sell: N.parse(t.sell),
+				High: N.parse(t.high),
+				Last: N.parse(t.last),
+				Low: N.parse(t.low),
+				Volume: N.parse(t.vol),
+				Time,
+				Currency,
+				BaseCurrency
+			};
+		});
 	}
 
 	Trade(type, price, amount, Currency = '', BaseCurrency = '') {
@@ -297,6 +320,23 @@ class ZB extends EXCHANGE {
 
 	GetRecords(...args) {
 		return this.rest.GetRecords(...args);
+	}
+
+	GetMarkets() {
+		return fetch('http://api.zb.com/data/v1/markets').then(r => r.json()).then(obj => {
+			let markets = Object.keys(obj);
+			return markets.map(key => {
+				let [Currency, BaseCurrency] = key.toUpperCase().split('_');
+				let { amountScale: StockDecimals, priceScale: Decimals } = obj[key];
+				return {
+					Currency,
+					BaseCurrency,
+					StockDecimals,
+					Decimals,
+					MinTradeAmount: Math.pow(10, -Decimals)
+				};
+			});
+		});
 	}
 
 }

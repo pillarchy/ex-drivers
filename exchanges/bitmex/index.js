@@ -1,41 +1,35 @@
 const N = require('precise-number');
-const { ok } = require('assert');
+const assert = require('better-assert');
 const R = require('ramda');
 const moment = require('moment');
 const REST = require('./rest.js');
+const WS = require('./ws.js');
 const EventEmitter = require('events');
 const EXCHANGE = require('../exchange.js');
 const ExError = require('../../lib/error');
 const ErrorCode = require('../../lib/error-code');
-const io = require('socket.io-client');
 
-class BITFLYER_FX extends EXCHANGE {
+class BITMEX extends EXCHANGE {
 	constructor(options) {
 
 		options = Object.assign({
-			Name: 'BITFLYER_FX',
+			Name: 'BITMEX',
 			Fees: {
-				Maker: 0,
-				Taker: 0
+				Maker: -0.00025,
+				Taker: 0.00075
 			},
 			RateLimit: 3,
-			Decimals: 0,
-			StockDecimals: 8,
+			Decimals: 1,
+			StockDecimals: 0,
 			MinTradeStocks: 0.01,
-			BaseCurrency: 'JPY',
-			Currency: 'BTC',
-			MarginLevel: 3,
-			SnapshotMode: true
+			BaseCurrency: 'USD',
+			Currency: 'XBT',
+			MarginLevel: 100
 		}, options);
 		super(options);
 
-		this.symbol = 'FX_' + options.Currency + '_' + options.BaseCurrency;
+		this.symbol = options.Currency + options.BaseCurrency;
 		this.options.ContractType = this.symbol;
-
-		this.fee = {
-			Maker: 0,
-			Taker: 0
-		};
 
 		this.rest = new REST(this.options);
 
@@ -47,168 +41,8 @@ class BITFLYER_FX extends EXCHANGE {
 		this.events = new EventEmitter();
 
 		if (this.options.isWS) {
-			this.initiateWS();
-
-			setInterval(() => {
-				if (Date.now() - this.lastDepthTime >= 5000) {
-					console.error('websocket dead, reconnecting ... ');
-					this.initiateWS();
-				}
-			}, 5000);
+			this.ws = new WS(this.options);
 		}
-	}
-
-	initiateWS() {
-		if (this.ws) {
-			try {
-				this.ws.close();
-			} catch (err) {
-				console.error('close old ws error', err);
-			}
-		}
-
-		try {
-
-			this.wsReady = false;
-
-			this.ws = io("https://io.lightstream.bitflyer.com", { transports: ["websocket"] });
-
-			let snapshotChannel = "lightning_board_snapshot_" + this.symbol;
-			let depthChannel = "lightning_board_" + this.symbol;
-			this.ws.on("connect", () => {
-				console.log('bitflyer_fx ws on open');
-				this.ws.emit("subscribe", snapshotChannel);
-
-				if (!this.options.SnapshotMode) {
-					this.ws.emit("subscribe", depthChannel);
-				}
-			});
-
-			this.ws.on(snapshotChannel, notify => {
-				this.wsReady = true;
-				this.buildOrderBook(notify);
-			});
-
-			this.ws.on(depthChannel, notify => {
-				this.wsReady = true;
-				this.updateOrderBook(notify);
-			});
-		} catch (err) {
-			console.error("new websocket error", err);
-		}
-	}
-
-	async buildOrderBook(depth) {
-		if (!depth) return;
-		this.orderbook = { Asks:{}, Bids:{}};
-		if (depth.asks && depth.asks.length > 0) {
-			depth.asks.map(r => {
-				this.orderbook.Asks[r.price] = N.parse(r.size);
-			});
-		}
-		if (depth.bids && depth.bids.length > 0) {
-			depth.bids.map(r => {
-				this.orderbook.Bids[r.price] = N.parse(r.size);
-			});
-		}
-		this.onDepthData();
-	}
-
-	updateOrderBook(data) {
-		// console.log('on orderbook update');
-		if (!this.orderbook) return;
-
-		if (data.bids && data.bids.length > 0) {
-			data.bids.map(d => {
-				let q = N.parse(d.size);
-				// console.log(d.price, d.size, q);
-				if (q > 0) {
-					this.orderbook.Bids[d.price] = q;
-					Object.keys(this.orderbook.Asks).map(price => {
-						if (N.parse(d.price) > N.parse(price)) this.orderbook.Asks[price] = 0;
-					});
-				} else {
-					delete(this.orderbook.Bids[d.price]);
-				}
-			});
-		}
-
-		if (data.asks && data.asks.length > 0) {
-			data.asks.map(d => {
-				let q = N.parse(d.size);
-				// console.log(d.price, d.size, q);
-				if (q > 0) {
-					this.orderbook.Asks[d.price] = q;
-					Object.keys(this.orderbook.Bids).map(price => {
-						if (N.parse(d.price) < N.parse(price)) this.orderbook.Bids[price] = 0;
-					});
-				} else {
-					delete(this.orderbook.Asks[d.price]);
-				}
-			});
-		}
-
-		let asks = Object.keys(this.orderbook.Asks).map(price => {
-			return {
-				Price: price,
-				Amount: N.parse(this.orderbook.Asks[price])
-			};
-		}).filter(d => d.Amount > 0);
-
-		let bids = Object.keys(this.orderbook.Bids).map(price => {
-			return {
-				Price: price,
-				Amount: N.parse(this.orderbook.Bids[price])
-			};
-		}).filter(d => d.Amount > 0);
-
-		this.orderbook = { Asks:{}, Bids:{}};
-		asks.map(r => {
-			this.orderbook.Asks[r.Price] = r.Amount;
-			r.Price = N.parse(r.Price);
-			return r;
-		});
-		bids.map(r => {
-			this.orderbook.Bids[r.Price] = r.Amount;
-			r.Price = N.parse(r.Price);
-			return r;
-		});
-
-		this.onDepthData();
-	}
-
-	onDepthData() {
-		if (!this.orderbook) return;
-
-		let asks = Object.keys(this.orderbook.Asks).map(price => {
-			return {
-				Price: N.parse(price),
-				Amount: N.parse(this.orderbook.Asks[price])
-			};
-		}).filter(d => d.Amount > 0);
-
-		let bids = Object.keys(this.orderbook.Bids).map(price => {
-			return {
-				Price: N.parse(price),
-				Amount: N.parse(this.orderbook.Bids[price])
-			};
-		}).filter(d => d.Amount > 0);
-
-		let depth = {
-			Asks: R.sort( R.ascend( R.prop('Price') ), asks),
-			Bids: R.sort( R.descend( R.prop('Price') ), bids),
-			Currency: this.options.Currency,
-			BaseCurrency: this.options.BaseCurrency,
-			ContractType: this.options.ContractType
-		};
-
-		if (typeof this.options.onDepth === 'function') {
-			this.options.onDepth(depth);
-		}
-
-		this.lastDepth = depth;
-		this.lastDepthTime = Date.now();
-		this.events.emit('depth', depth);
 	}
 
 	GetDepth() {
@@ -503,4 +337,4 @@ class BITFLYER_FX extends EXCHANGE {
 }
 
 
-module.exports = BITFLYER_FX;
+module.exports = BITMEX;

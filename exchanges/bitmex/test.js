@@ -1,19 +1,18 @@
 const config = require('../../accounts.config.json');
-const { BITFLYER_FX: EX } = require('../../index.js');
+const { BITMEX: EX } = require('../../index.js');
 const wait = require('delay');
 
 let ex = new EX({
-	Key: config.bitflyer.key,
-	Secret: config.bitflyer.secret,
-	Currency: 'BTC',
+	Key: config.bitmex.key,
+	Secret: config.bitmex.secret,
+	Currency: 'XBT',
 	isWS: true,
-	SnapshotMode: false,
-	RateLimit: 1,
-	RateLimitInterval: 10000,
-	ThrowWhenRateLimited: true,
+	RateLimit: 2,
+	RateLimitInterval: 1000,
+	// ThrowWhenRateLimited: true,
 	onDepth: (depth) => {
-		// console.log('on depth');
-		console.log('depth', depth.Asks.length, depth.Bids.length, depth.Asks[0].Price, depth.Bids[0].Price);
+		console.log(depth);
+		// console.log('depth', depth.Asks.length, depth.Bids.length, depth.Asks[0].Price, depth.Bids[0].Price);
 	}
 });
 
@@ -24,8 +23,8 @@ describe('test Bitflyer', function() {
 
 	this.timeout(10000);
 
-	it('should get ticker', () => ex.GetTicker().then(log));
-	it('should get ticker', () => ex.GetTicker().then(log));
+	// it('should get ticker', () => ex.GetTicker().then(log));
+	// it('should get ticker', () => ex.GetTicker().then(log));
 
 	// it('should get depth', () => ex.GetDepth().then(log));
 	// 
@@ -67,8 +66,8 @@ describe('test Bitflyer', function() {
 	// 	console.log(await ex.CancelPendingOrders());
 	// });
 
-	// it('should wait for a long time', function() {
-	// 	this.timeout(1000000000);
-	// 	return wait(1000000000);
-	// });
+	it('should wait for a long time', function() {
+		this.timeout(1000000000);
+		return wait(1000000000);
+	});
 });

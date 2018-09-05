@@ -195,8 +195,7 @@ class OKEX_REST {
 			from: From,
 			to: To
 		};
-		let re = await this.fetch('funds_transfer.do', params);
-		return re;
+		return await this.fetch('funds_transfer.do', params);
 	}
 
 	GetDepth(Currency, BaseCurrency, size, merge) {
