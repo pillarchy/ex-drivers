@@ -175,7 +175,7 @@ class OKEX_WS extends Events {
 		});
 
 		let depth = {
-			Time: Math.round(timestamp * 1000),
+			Time: N.parse(timestamp),
 			Asks: R.sort( R.ascend( R.prop('Price') ), asks),
 			Bids: R.sort( R.descend( R.prop('Price') ), bids),
 			...this._parse_ch(channel)
