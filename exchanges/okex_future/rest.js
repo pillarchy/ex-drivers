@@ -12,9 +12,11 @@ class OKEX {
 		this.secret = options.Secret;
 		this.symbol = options.Currency.toLowerCase() + '_' + options.BaseCurrency.toLowerCase();
 		this.options = options;
+		if (!this.options.rateLimiter) throw 'No rateLimiter in options';
 	}
 
-	fetch(url, params, method) {
+	async fetch(url, params, method) {
+		await this.options.rateLimiter.wait();
 		let body = '';
 		if (!method) method = 'POST';
 		if (method === 'POST') {

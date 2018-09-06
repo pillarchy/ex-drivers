@@ -32,9 +32,9 @@ class OKEX_FUTURE extends EXCHANGE {
 
 		if (this.options.BaseCurrency !== 'USD') throw new Error('okex future BaseCurrency should be USD');
 
-		this.options = options;
+		// this.options = options;
 		if (options.isWS) {
-			this.ws = new EXCHANGE_WS(options);
+			this.ws = new EXCHANGE_WS(this.options);
 			this.ws.on('connect', () => {
 				this.wsReady = true;
 			});
@@ -42,7 +42,7 @@ class OKEX_FUTURE extends EXCHANGE {
 				this.wsReady = false;
 			});
 		}
-		this.rest = new EXCHANGE_REST(options);
+		this.rest = new EXCHANGE_REST(this.options);
 	}
 
 	_check_contract_type(contract_type) {
