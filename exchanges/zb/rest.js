@@ -1,4 +1,3 @@
-
 const N = require('precise-number');
 const { ok } = require('assert');
 const R = require('ramda');
