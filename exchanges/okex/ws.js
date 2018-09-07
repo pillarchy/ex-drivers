@@ -17,6 +17,9 @@ class OKEX_WS extends Events {
 
 		this.ws = new WebSocket('wss://real.okex.com:10441/websocket');
 
+
+		this.depthSize = this.options.DepthSize || 20;
+
 		//remember subscription commands
 		this.subscriptionCommands = [];
 
@@ -30,7 +33,7 @@ class OKEX_WS extends Events {
 		if (this.options.onDepth) {
 			this.subscriptionCommands.push(JSON.stringify({
 				event: 'addChannel',
-				channel: `ok_sub_spot_${this.symbol}_depth_20`
+				channel: `ok_sub_spot_${this.symbol}_depth_${this.depthSize}`
 			}).replace(/\"/g, "'"));
 		}
 
@@ -140,7 +143,7 @@ class OKEX_WS extends Events {
 		if (type === 'Ticker') {
 			channel = `ok_sub_spot_${symbol}_ticker`;
 		} else if (type === 'Depth') {
-			channel = `ok_sub_spot_${symbol}_depth_20`;
+			channel = `ok_sub_spot_${symbol}_depth_${this.depthSize}`;
 		} else if (type === 'PublicTrades') {
 			channel = `ok_sub_spot_${symbol}_deals`;
 		}

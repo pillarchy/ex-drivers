@@ -199,6 +199,9 @@ class OKEX_REST {
 	}
 
 	GetDepth(Currency, BaseCurrency, size, merge) {
+		Currency = Currency || this.options.Currency;
+		BaseCurrency = BaseCurrency || this.options.BaseCurrency;
+
 		let params = ['symbol=' + this._getSymbol(Currency, BaseCurrency)];
 		if (!size) size = 50;
 		if (size) params.push('size=' + size);
@@ -207,7 +210,7 @@ class OKEX_REST {
 		return this.fetch('depth.do?' + params.join('&'), null, 'GET').then(data => {
 
 			if (!data || !data.bids || !data.asks) throw new Error('get okcoin ' + this.symbol + ' depth error ' + JSON.stringify(data));
-
+console.log(data);
 			let asks = [];
 			let bids = [];
 
@@ -228,6 +231,8 @@ class OKEX_REST {
 			return Promise.resolve({
 				Asks: R.sort( R.ascend( R.prop('Price') ), asks),
 				Bids: R.sort( R.descend( R.prop('Price') ), bids),
+				Currency,
+				BaseCurrency,
 				...this._parse_ch(this._getSymbol(Currency, BaseCurrency))
 			});
 		});
