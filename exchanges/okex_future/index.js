@@ -10,8 +10,8 @@ class OKEX_FUTURE extends EXCHANGE {
 		options = Object.assign({
 			Name: 'OKEX_FUTURE',
 			Fees: {
-				Maker: 0.0003,
-				Taker: 0.0005
+				Maker: 0.0001,
+				Taker: 0.0003
 			},
 			RateLimit: 10,
 			Decimals: 8,
