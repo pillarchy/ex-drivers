@@ -3,6 +3,7 @@ const WS = require('./ws.js');
 const N = require('precise-number');
 const R = require('ramda');
 const EXCHANGE = require('../exchange.js');
+const fetch = require('node-fetch');
 
 class HUOBI extends EXCHANGE {
 	constructor(options) {
@@ -186,6 +187,28 @@ class HUOBI extends EXCHANGE {
 		}).then(trades => {
 			return R.sort( R.ascend( R.prop('Time') ), trades);
 		});
+	}
+
+	GetMarkets() {
+		let url = this.options.hadax ? 'https://api.huobipro.com/v1/hadax/common/symbols' : 'https://api.huobipro.com/v1/common/symbols';
+		return fetch(url).then(res => res.json()).then(obj => {
+			let arr = obj ? obj.data : [];
+			let re = [];
+			arr.map(m => {
+				if (!m || !m.symbol) return;
+				let Currency = m['base-currency'].toUpperCase();
+				let BaseCurrency = m['quote-currency'].toUpperCase();
+				let Decimals = m['price-precision'];
+				let StockDecimals = m['amount-precision'];
+				re.push({
+					Currency,
+					BaseCurrency,
+					Decimals,
+					StockDecimals
+				});
+			});
+			return re;
+		})
 	}
 
 	async GetPublicTrades(Currency, BaseCurrency, size = 600) {
