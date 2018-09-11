@@ -6,9 +6,11 @@ let ex = new EX({
 	BaseCurrency: 'USDT',
 	Key: config.okex.key,
 	Secret: config.okex.secret,
+	DepthSize: 5,
 	isWS: true,
 	onDepth(data) {
-		console.log('onDepth', data.Currency, data.BaseCurrency, data.Asks.length, data.Bids.length);
+		console.log(data);
+		// console.log('onDepth', data.Currency, data.BaseCurrency, data.Asks.length, data.Bids.length);
 	},
 	onTicker(data) {
 		console.log('onTicker', data);

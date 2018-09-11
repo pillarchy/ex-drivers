@@ -8,19 +8,19 @@ let ex = new EX({
 	Secret: config.okex.secret,
 	isWS: true,
 	DefaultContactType: 'quarter',
-	onDepth(data) {
-		console.log('onDepth', data.Currency, data.BaseCurrency, data.Asks.length, data.Bids.length);
-	},
-	onTicker(data) {
-		console.log('onTicker', data.Currency, data.BaseCurrency, data.Buy, data.Sell);
-	},
+	// onDepth(data) {
+	// 	console.log('onDepth', data.Currency, data.BaseCurrency, data.ContractType, data.Asks[0].Price, data.Bids[0].Price);
+	// },
+	// onTicker(data) {
+	// 	console.log('onTicker', data.Currency, data.BaseCurrency, data.Buy, data.Sell);
+	// },
 	onPublicTrades(data) {
 		console.log('onPublicTrades', data);
 	}
 });
 
 //subscribe more data
-ex.Subscribe('EOS', 'USD', 'Depth');
-ex.Subscribe('EOS', 'USD', 'Ticker');
-ex.Subscribe('EOS', 'USD', 'PublicTrades');
+// ex.Subscribe('BTC', 'USD', 'Depth', 'this_week');
+// ex.Subscribe('EOS', 'USD', 'Ticker');
+// ex.Subscribe('EOS', 'USD', 'PublicTrades');
 

@@ -128,7 +128,7 @@ class OKEX_FUTURE_WS extends Events {
 	}
 
 	onPong() {
-		let gap = Date.now() - this.lastPingTime;
+		// let gap = Date.now() - this.lastPingTime;
 		// console.log('okex websocket ping pong time:', gap + 'ms');
 		this.lastPong = Date.now();
 	}
@@ -177,7 +177,7 @@ class OKEX_FUTURE_WS extends Events {
 		});
 
 		let depth = {
-			Time: Math.round(timestamp * 1000),
+			Time: Math.round(timestamp),
 			Asks: R.sort( R.ascend( R.prop('Price') ), asks),
 			Bids: R.sort( R.descend( R.prop('Price') ), bids),
 			...this._parse_ch(channel)
